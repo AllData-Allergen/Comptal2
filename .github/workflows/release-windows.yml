@@ -23,8 +23,9 @@ jobs:
           cache: npm
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@1.98.0
+        uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: 1.98.0
           targets: x86_64-pc-windows-msvc
 
       - name: Cache Rust
@@ -35,12 +36,17 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Ensure updater password env is defined
+        shell: pwsh
+        run: Add-Content -Path $env:GITHUB_ENV -Value "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
       - name: Build NSIS installer and publish GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: Comptal2.1 v__VERSION__
