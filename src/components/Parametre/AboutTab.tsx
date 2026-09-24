@@ -3,7 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Info, RefreshCw, DownloadCloud, Shield } from 'lucide-react';
 import { Update } from '@tauri-apps/plugin-updater';
 import { Logger } from '../../services/logger';
-import { UpdateService, UpdateProgress } from '../../services/UpdateService';
+import {
+  UpdateService,
+  UpdateProgress,
+  classifyUpdateCheckError,
+  UPDATER_MANIFEST_URL,
+  UpdateCheckFailureReason,
+} from '../../services/UpdateService';
 
 type UpdateState =
   | { phase: 'idle' }
@@ -12,7 +18,7 @@ type UpdateState =
   | { phase: 'available'; update: Update }
   | { phase: 'downloading'; percent: number }
   | { phase: 'installing' }
-  | { phase: 'error' };
+  | { phase: 'error'; reason: UpdateCheckFailureReason };
 
 const AboutTab: React.FC = () => {
   const { t } = useTranslation();
@@ -26,7 +32,7 @@ const AboutTab: React.FC = () => {
       setState(update ? { phase: 'available', update } : { phase: 'upToDate' });
     } catch (err) {
       Logger.error('AboutTab.handleCheck', err);
-      setState({ phase: 'error' });
+      setState({ phase: 'error', reason: classifyUpdateCheckError(err) });
     }
   };
 
@@ -46,9 +52,21 @@ const AboutTab: React.FC = () => {
       setState({ phase: 'installing' });
     } catch (err) {
       Logger.error('AboutTab.handleInstall', err);
-      setState({ phase: 'error' });
+      setState({ phase: 'error', reason: classifyUpdateCheckError(err) });
     }
   };
+
+  const updateErrorMessage = (() => {
+    if (state.phase !== 'error') return '';
+    switch (state.reason) {
+      case 'offline':
+        return t('settings.about.updateErrorOffline');
+      case 'no_release':
+        return t('settings.about.updateErrorNoRelease', { url: UPDATER_MANIFEST_URL });
+      default:
+        return t('settings.about.updateErrorUnknown', { url: UPDATER_MANIFEST_URL });
+    }
+  })();
 
   return (
     <div className="flex flex-col gap-6">
@@ -114,7 +132,7 @@ const AboutTab: React.FC = () => {
 
           {state.phase === 'error' && (
             <p className="text-sm" style={{ color: 'var(--invoicing-warning)' }}>
-              {t('settings.about.updateError')}
+              {updateErrorMessage}
             </p>
           )}
 

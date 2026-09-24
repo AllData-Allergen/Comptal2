@@ -74,7 +74,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZCNkZEQjQ0RjY5MUUyNTUKUldSVjRwSDJSTnR2YTZTWmFVdWNQNE5PRjFUR1JxeEI2LzF5K3VGTEpKejRDR1ozNGR1MlZHZGsK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUyMDYzQ0FFRjY0Q0M4MUUKUldRZXlFejJyandHVWdzSXJseUx5c0l2V2d6ZHVwa0VlSHpUNUlCZm5yRnJVTlBIOXZoRzVvQUcK",
       "endpoints": [
         "https://github.com/AllData-Allergen/Comptal2/releases/latest/download/latest.json"
       ],

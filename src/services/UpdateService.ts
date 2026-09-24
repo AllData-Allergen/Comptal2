@@ -5,9 +5,55 @@ import { check, Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { withLog, Logger } from './logger';
 
+export const UPDATER_MANIFEST_URL =
+  'https://github.com/AllData-Allergen/Comptal2/releases/latest/download/latest.json';
+
 export interface UpdateProgress {
   downloaded: number;
   total: number | null;
+}
+
+export type UpdateCheckFailureReason = 'offline' | 'no_release' | 'unknown';
+
+function errorText(err: unknown): string {
+  if (err instanceof Error) return `${err.message}\n${err.stack ?? ''}`;
+  return String(err);
+}
+
+/** Classe l'échec de `check()` pour afficher un message UI explicite. */
+export function classifyUpdateCheckError(err: unknown): UpdateCheckFailureReason {
+  const text = errorText(err).toLowerCase();
+
+  const offlineHints = [
+    'network',
+    'connection',
+    'connect',
+    'timed out',
+    'timeout',
+    'dns',
+    'offline',
+    'unreachable',
+    'failed to fetch',
+    'error sending request',
+    'could not resolve',
+  ];
+  if (offlineHints.some((h) => text.includes(h))) {
+    return 'offline';
+  }
+
+  const noReleaseHints = [
+    '404',
+    'not found',
+    'latest.json',
+    'no release',
+    'release not found',
+    'releasenotfound',
+  ];
+  if (noReleaseHints.some((h) => text.includes(h))) {
+    return 'no_release';
+  }
+
+  return 'unknown';
 }
 
 export const UpdateService = {

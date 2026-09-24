@@ -265,7 +265,9 @@
       "download": "Download and install",
       "downloading": "Downloading… {{percent}}%",
       "installing": "Installing… The application will restart.",
-      "updateError": "Check failed (offline or no published release)."
+      "updateErrorOffline": "Update check failed: no network connection or server unreachable.",
+      "updateErrorNoRelease": "No published release yet (update manifest not found). Expected URL: {{url}}",
+      "updateErrorUnknown": "Update check failed. If this persists, verify {{url}}"
     },
     "plugins": {
       "title": "Plugins / mods",

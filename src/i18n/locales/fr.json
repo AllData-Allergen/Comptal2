@@ -265,7 +265,9 @@
       "download": "Télécharger et installer",
       "downloading": "Téléchargement… {{percent}}%",
       "installing": "Installation… L'application va redémarrer.",
-      "updateError": "Vérification impossible (hors-ligne ou aucune release publiée)."
+      "updateErrorOffline": "Vérification impossible : pas de connexion réseau ou serveur injoignable.",
+      "updateErrorNoRelease": "Aucune release publiée pour le moment (manifest introuvable). URL attendue : {{url}}",
+      "updateErrorUnknown": "Vérification impossible. Si le problème persiste, vérifiez {{url}}"
     },
     "plugins": {
       "title": "Plugins / mods",

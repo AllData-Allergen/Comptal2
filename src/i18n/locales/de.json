@@ -265,7 +265,9 @@
       "download": "Herunterladen und installieren",
       "downloading": "Download… {{percent}} %",
       "installing": "Installation… Die Anwendung wird neu gestartet.",
-      "updateError": "Prüfung nicht möglich (offline oder keine veröffentlichte Version)."
+      "updateErrorOffline": "Update-Prüfung fehlgeschlagen: Keine Netzwerkverbindung oder Server nicht erreichbar.",
+      "updateErrorNoRelease": "Noch keine veröffentlichte Version (Manifest nicht gefunden). Erwartete URL: {{url}}",
+      "updateErrorUnknown": "Update-Prüfung fehlgeschlagen. Prüfen Sie ggf. {{url}}"
     },
     "plugins": {
       "title": "Plugins / Mods",
