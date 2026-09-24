@@ -40,4 +40,10 @@ export const REGISTER_TYPE_META: Record<
     description: 'Regroupez les mouvements bancaires par catégorie sur une période.',
     group: 'general',
   },
+  amortissement_register: {
+    title: 'État des amortissements',
+    shortTitle: 'Amortissements',
+    description: 'Fige le registre des immobilisations : brut, amorti, dotation de période et VNC.',
+    group: 'general',
+  },
 };

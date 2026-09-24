@@ -16,13 +16,13 @@ import TourOverlay from './components/Onboarding/TourOverlay';
 import OnboardingLauncher from './components/Onboarding/OnboardingLauncher';
 import PageIntroRunner from './components/Onboarding/PageIntroRunner';
 import ScopeDisclaimerModal from './components/Common/ScopeDisclaimerModal';
-import UpdateNotifier from './components/Common/UpdateNotifier';
 
 const Previsionnel = lazy(() => import('./pages/Previsionnel/Previsionnel'));
 const Facturation = lazy(() => import('./pages/Facturation/Facturation'));
 const ClientPage = lazy(() => import('./pages/Client/Client'));
 const Association = lazy(() => import('./pages/Association/Association'));
 const Register = lazy(() => import('./pages/Register/Register'));
+const Amortissement = lazy(() => import('./pages/Amortissement/Amortissement'));
 
 const MenuVisibleRoute: React.FC<{ page: keyof MenuVisibility; children: React.ReactNode }> = ({
   page,
@@ -81,6 +81,14 @@ const AppRoutes: React.FC = () => {
           </MenuVisibleRoute>
         }
       />
+      <Route
+        path="/amortissement"
+        element={
+          <MenuVisibleRoute page="amortissement">
+            <Amortissement />
+          </MenuVisibleRoute>
+        }
+      />
       <Route path="/parametre" element={<Parametre />} />
     </Routes>
   );
@@ -112,7 +120,6 @@ const App: React.FC = () => {
         <OnboardingLauncher />
         <PageIntroRunner />
         <ScopeDisclaimerModal isOpen={scopeOpen} onAcknowledge={() => void acknowledgeScope()} />
-        <UpdateNotifier />
         <ToastContainer
           position="bottom-right"
           autoClose={3000}

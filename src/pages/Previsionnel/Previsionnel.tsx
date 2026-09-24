@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
-import { addYears } from 'date-fns';
 import { Loader2 } from 'lucide-react';
 import { Category } from '../../types/models';
 import {
@@ -18,11 +17,23 @@ import {
 } from '../../types/forecast';
 import { ConfigService } from '../../services/ConfigService';
 import { ProjectService } from '../../services/ProjectService';
-import { computeForecast, ForecastGridRow, treeToGridRows, collectDescendantIds } from '../../services/ForecastModel';
+import {
+  computeForecast,
+  emptyForecastComputed,
+  ForecastGridRow,
+  treeToGridRows,
+  removeNodeFromTree,
+} from '../../services/ForecastModel';
 import { Logger } from '../../services/logger';
 import { Db } from '../../services/db';
 import { parseAmount } from '../../utils/amounts';
-import { toIsoDate } from '../../utils/dateFormats';
+import {
+  defaultForecastRange,
+  parseForecastIso,
+  sanitizeForecastRange,
+  sanitizeLineEndDate,
+  sanitizeLineStartDate,
+} from '../../utils/forecastDates';
 import ConfirmModal from '../../components/Common/ConfirmModal';
 import Modal from '../../components/Common/Modal';
 import PrevisionnelToolbar from '../../components/Previsionnel/PrevisionnelToolbar';
@@ -34,8 +45,29 @@ import FromTransactionDialog from '../../components/Previsionnel/FromTransaction
 import '../../styles/previsionnel-custom.css';
 
 function defaultRange(): { start: string; end: string } {
-  const start = new Date();
-  return { start: toIsoDate(start), end: toIsoDate(addYears(start, 1)) };
+  return defaultForecastRange();
+}
+
+function toastForecastDateIssues(
+  t: (key: string) => string,
+  issues: string[],
+  fn: string
+): void {
+  if (issues.length === 0) return;
+  Logger.error(
+    fn,
+    new Error(`Dates incompatibles: ${issues.join(',')}`),
+    issues.join(',')
+  );
+  if (issues.includes('start_after_end')) {
+    toast.warn(t('previsionnel.dateStartAfterEnd'));
+  } else if (issues.includes('invalid_start') || issues.includes('empty_start')) {
+    toast.warn(t('previsionnel.invalidStartDate'));
+  } else if (issues.includes('invalid_end') || issues.includes('empty_end')) {
+    toast.warn(t('previsionnel.invalidEndDate'));
+  } else {
+    toast.warn(t('previsionnel.invalidDateRange'));
+  }
 }
 
 function insertParentId(row: ForecastGridRow | null | undefined): number | null {
@@ -80,7 +112,10 @@ const PrevisionnelPage: React.FC = () => {
   const [fromCategoryOpen, setFromCategoryOpen] = useState(false);
   const [fromTransactionOpen, setFromTransactionOpen] = useState(false);
   const [dialogParentId, setDialogParentId] = useState<number | null>(null);
+  const [discardEditNonce, setDiscardEditNonce] = useState(0);
   const saveTimer = useRef<number | null>(null);
+  /** Invalide les refreshTree / patch en vol après une suppression. */
+  const treeMutationSeq = useRef(0);
 
   const rows = useMemo(() => treeToGridRows(tree), [tree]);
   const selectedRow = useMemo(
@@ -90,12 +125,23 @@ const PrevisionnelPage: React.FC = () => {
 
   const computed: ForecastComputed | null = useMemo(() => {
     if (!project) return null;
-    return computeForecast(
-      { ...project, startDate, endDate, initialBalance: parseAmount(initialBalance) },
-      tree,
-      categories,
-      layout.chartGranularity
-    );
+    try {
+      const range = sanitizeForecastRange(startDate, endDate, defaultRange());
+      return computeForecast(
+        {
+          ...project,
+          startDate: range.startDate,
+          endDate: range.endDate,
+          initialBalance: parseAmount(initialBalance),
+        },
+        tree,
+        categories,
+        layout.chartGranularity
+      );
+    } catch (err) {
+      Logger.error('Previsionnel.computeForecast', err);
+      return emptyForecastComputed(parseAmount(initialBalance));
+    }
   }, [project, startDate, endDate, initialBalance, tree, categories, layout.chartGranularity]);
 
   const loadList = useCallback(async (preferId?: number) => {
@@ -110,14 +156,31 @@ const PrevisionnelPage: React.FC = () => {
     const found = await ProjectService.get(id);
     if (!found) return;
     const nextTree = await ProjectService.listSubscriptionTree(id);
+    const range = sanitizeForecastRange(found.startDate, found.endDate, defaultRange());
+    if (range.issues.length > 0) {
+      Logger.error(
+        'Previsionnel.loadProject.dates',
+        new Error(`Dates projet incompatibles: ${range.issues.join(',')}`),
+        `id=${id} start=${found.startDate} end=${found.endDate}`
+      );
+    }
     setProject(found);
     setTree(nextTree);
     setName(found.name);
-    setStartDate(found.startDate);
-    setEndDate(found.endDate);
+    setStartDate(range.startDate);
+    setEndDate(range.endDate);
     setInitialBalance(String(found.initialBalance));
     setLayout(found.widgetLayout);
     setSelectedRowId(null);
+    if (
+      range.issues.length > 0 &&
+      (range.startDate !== found.startDate || range.endDate !== found.endDate)
+    ) {
+      void ProjectService.update(id, {
+        startDate: range.startDate,
+        endDate: range.endDate,
+      }).catch((err) => Logger.error('Previsionnel.healProjectDates', err));
+    }
   }, []);
 
   useEffect(() => {
@@ -232,11 +295,15 @@ const PrevisionnelPage: React.FC = () => {
     [projectId, startDate, t, tree.length]
   );
 
-  const refreshTree = useCallback(async () => {
-    if (projectId === '') return;
-    const next = await ProjectService.listSubscriptionTree(projectId);
-    setTree(next);
-  }, [projectId]);
+  const refreshTree = useCallback(
+    async (expectedSeq?: number) => {
+      if (projectId === '') return;
+      const next = await ProjectService.listSubscriptionTree(projectId);
+      if (expectedSeq !== undefined && expectedSeq !== treeMutationSeq.current) return;
+      setTree(next);
+    },
+    [projectId]
+  );
 
   const handleAddLine = async (parentId: number | null = insertParentId(selectedRow)) => {
     if (projectId === '') return;
@@ -297,13 +364,20 @@ const PrevisionnelPage: React.FC = () => {
       toast.info(t('previsionnel.selectRow'));
       return;
     }
+    const id = selectedRow.id;
+    // Annule l’édition sans commit (le mousedown du bouton empêche déjà le blur-commit).
+    setDiscardEditNonce((n) => n + 1);
+    treeMutationSeq.current += 1;
+    const seq = treeMutationSeq.current;
+    setTree((prev) => removeNodeFromTree(prev, id));
+    setSelectedRowId(null);
     try {
-      await ProjectService.removeSubscription(selectedRow.id);
-      setSelectedRowId(null);
-      await refreshTree();
+      await ProjectService.removeSubscription(id);
+      await refreshTree(seq);
     } catch (err) {
       Logger.error('Previsionnel.deleteRow', err);
       toast.error(t('common.error'));
+      await refreshTree();
     }
   };
 
@@ -312,9 +386,10 @@ const PrevisionnelPage: React.FC = () => {
     const row = rows[rowIndex];
     if (!row) return;
     if (!row.id && Object.keys(patch).length === 1 && patch.name === '') return;
+    const seqAtStart = treeMutationSeq.current;
     try {
       let parentId = row.parentId;
-      if (patch.groupName !== undefined) {
+      if (patch.groupName !== undefined && !row.isGroup) {
         const wanted = patch.groupName.trim();
         if (!wanted) {
           parentId = null;
@@ -323,12 +398,9 @@ const PrevisionnelPage: React.FC = () => {
             (r) => r.isGroup && r.id && r.name.toLowerCase() === wanted.toLowerCase() && r.id !== row.id
           );
           if (match?.id) {
-            if (row.id && row.isGroup && collectDescendantIds(tree, row.id).has(match.id)) {
-              toast.warn(t('previsionnel.invalidGroup'));
-              return;
-            }
             parentId = match.id;
           } else {
+            if (seqAtStart !== treeMutationSeq.current) return;
             parentId = await ProjectService.addSubscription(
               defaultSub({ name: wanted, isGroup: true, amount: 0 })
             );
@@ -341,38 +413,94 @@ const PrevisionnelPage: React.FC = () => {
           ? resolveCategoryInput(patch.categoryCode, categories)
           : undefined;
 
+      if (seqAtStart !== treeMutationSeq.current) return;
+
       if (row.id) {
         const fields: Parameters<typeof ProjectService.updateSubscription>[1] = {};
         if (patch.name !== undefined && patch.name.trim()) fields.name = patch.name.trim();
-        if (patch.type !== undefined) fields.type = patch.type;
-        if (patch.amount !== undefined && !row.isGroup) fields.amount = patch.amount;
-        if (patch.periodicity !== undefined) fields.periodicity = patch.periodicity;
-        if (patch.startDate !== undefined) fields.startDate = patch.startDate || startDate;
-        if (patch.endDate !== undefined) fields.endDate = patch.endDate || null;
+        // Sur un Groupe : type / montant / périodicité / dates / parent sont dérivés des enfants.
+        if (!row.isGroup) {
+          if (patch.type !== undefined) fields.type = patch.type;
+          if (patch.amount !== undefined) fields.amount = patch.amount;
+          if (patch.periodicity !== undefined) fields.periodicity = patch.periodicity;
+          if (patch.startDate !== undefined) {
+            const sanitized = sanitizeLineStartDate(patch.startDate, startDate);
+            if (sanitized.issue) {
+              toastForecastDateIssues(t, [sanitized.issue], 'Previsionnel.patchStartDate');
+              return;
+            }
+            const nextStart = sanitized.value || startDate;
+            fields.startDate = nextStart;
+            // Si le nouveau début dépasse la fin existante (non patchée), passer en illimité.
+            if (patch.endDate === undefined && row.endDate) {
+              const endCheck = sanitizeLineEndDate(row.endDate, nextStart);
+              if (endCheck.issue === 'start_after_end') {
+                toastForecastDateIssues(t, ['start_after_end'], 'Previsionnel.patchStartDate');
+                fields.endDate = null;
+              }
+            }
+          }
+          if (patch.endDate !== undefined) {
+            const lineStart =
+              patch.startDate !== undefined
+                ? sanitizeLineStartDate(patch.startDate, startDate).value || startDate
+                : row.startDate || startDate;
+            const sanitized = sanitizeLineEndDate(patch.endDate, lineStart);
+            if (sanitized.issue === 'invalid_end') {
+              toastForecastDateIssues(t, [sanitized.issue], 'Previsionnel.patchEndDate');
+              return;
+            }
+            if (sanitized.issue === 'start_after_end') {
+              toastForecastDateIssues(t, [sanitized.issue], 'Previsionnel.patchEndDate');
+              fields.endDate = null;
+            } else {
+              fields.endDate = sanitized.value;
+            }
+          }
+          if (patch.groupName !== undefined) fields.parentId = parentId;
+        }
         if (categoryCode !== undefined) fields.categoryCode = categoryCode;
         if (patch.color !== undefined) fields.color = patch.color;
-        if (patch.groupName !== undefined) fields.parentId = parentId;
         if (Object.keys(fields).length === 0) return;
+        if (seqAtStart !== treeMutationSeq.current) return;
         await ProjectService.updateSubscription(row.id, fields);
       } else {
         const nameValue = (patch.name ?? row.name).trim() || t('previsionnel.newLine');
+        const lineStart = sanitizeLineStartDate(
+          patch.startDate ?? row.startDate,
+          startDate
+        );
+        if (lineStart.issue) {
+          toastForecastDateIssues(t, [lineStart.issue], 'Previsionnel.addLineStartDate');
+          return;
+        }
+        const lineEnd = sanitizeLineEndDate(
+          patch.endDate ?? row.endDate,
+          lineStart.value || startDate
+        );
+        if (lineEnd.issue === 'invalid_end') {
+          toastForecastDateIssues(t, [lineEnd.issue], 'Previsionnel.addLineEndDate');
+          return;
+        }
+        if (seqAtStart !== treeMutationSeq.current) return;
         const id = await ProjectService.addSubscription(
           defaultSub({
             name: nameValue,
             type: patch.type ?? row.type,
             amount: patch.amount ?? row.amount,
             periodicity: patch.periodicity ?? row.periodicity,
-            startDate: patch.startDate || row.startDate || startDate,
-            endDate: patch.endDate || row.endDate || null,
+            startDate: lineStart.value || startDate,
+            endDate: lineEnd.issue === 'start_after_end' ? null : lineEnd.value,
             categoryCode: categoryCode !== undefined ? categoryCode : row.categoryCode || null,
             color: patch.color ?? row.color,
             parentId,
             isGroup: row.isGroup,
           })
         );
+        if (seqAtStart !== treeMutationSeq.current) return;
         setSelectedRowId(id);
       }
-      await refreshTree();
+      await refreshTree(seqAtStart);
     } catch (err) {
       Logger.error('Previsionnel.patchCell', err);
       toast.error(t('common.error'));
@@ -452,12 +580,40 @@ const PrevisionnelPage: React.FC = () => {
           persistConfig({ name: value });
         }}
         onStartDateChange={(value) => {
-          setStartDate(value);
-          persistConfig({ startDate: value });
+          const parsed = parseForecastIso(value);
+          if (!parsed) {
+            toastForecastDateIssues(t, [value.trim() ? 'invalid_start' : 'empty_start'], 'Previsionnel.startDate');
+            return;
+          }
+          const range = sanitizeForecastRange(parsed, endDate || defaultRange().end, {
+            start: parsed,
+            end: endDate || defaultRange().end,
+          });
+          setStartDate(range.startDate);
+          if (range.endDate !== endDate) setEndDate(range.endDate);
+          persistConfig({
+            startDate: range.startDate,
+            ...(range.endDate !== endDate ? { endDate: range.endDate } : {}),
+          });
+          toastForecastDateIssues(t, range.issues, 'Previsionnel.startDate');
         }}
         onEndDateChange={(value) => {
-          setEndDate(value);
-          persistConfig({ endDate: value });
+          const parsed = parseForecastIso(value);
+          if (!parsed) {
+            toastForecastDateIssues(t, [value.trim() ? 'invalid_end' : 'empty_end'], 'Previsionnel.endDate');
+            return;
+          }
+          const range = sanitizeForecastRange(startDate || defaultRange().start, parsed, {
+            start: startDate || defaultRange().start,
+            end: parsed,
+          });
+          setEndDate(range.endDate);
+          if (range.startDate !== startDate) setStartDate(range.startDate);
+          persistConfig({
+            endDate: range.endDate,
+            ...(range.startDate !== startDate ? { startDate: range.startDate } : {}),
+          });
+          toastForecastDateIssues(t, range.issues, 'Previsionnel.endDate');
         }}
         onBalanceChange={(value) => {
           setInitialBalance(value);
@@ -469,6 +625,8 @@ const PrevisionnelPage: React.FC = () => {
         }}
         onDelete={() => setConfirmDelete(true)}
         onAddLine={() => void handleAddLine()}
+        onFromCategory={() => openFromCategory(insertParentId(selectedRow))}
+        onFromTransaction={() => openFromTransaction(insertParentId(selectedRow))}
         onAddGroup={() => void handleAddGroup()}
         onDuplicate={() => void handleDuplicate()}
         onDeleteRow={() => void handleDeleteRow()}
@@ -493,6 +651,7 @@ const PrevisionnelPage: React.FC = () => {
                 columnWidths={layout.columnWidths}
                 categories={categories}
                 selectedRowId={selectedRowId}
+                discardEditNonce={discardEditNonce}
                 onSelectRow={(id) => setSelectedRowId(id)}
                 onPatch={(rowIndex, patch) => void handlePatch(rowIndex, patch)}
                 onColumnsChange={handleColumnsChange}

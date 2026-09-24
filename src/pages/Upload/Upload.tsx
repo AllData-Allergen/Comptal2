@@ -9,7 +9,7 @@ import {
   HelpCircle,
   SkipForward,
 } from 'lucide-react';
-import { Account } from '../../types/models';
+import { Account, Category, CategoryGroup } from '../../types/models';
 import {
   ColumnMappingConfig,
   ColumnRole,
@@ -26,20 +26,35 @@ import {
   isImportableStructure,
 } from '../../services/ColumnMappingService';
 import { ImportService, transformRows } from '../../services/ImportService';
+import {
+  applyCategoryCodesToRows,
+  CategoryImportService,
+  CategoryValueStats,
+} from '../../services/CategoryImportService';
+import {
+  applyAccountIdsToRows,
+  AccountImportService,
+  AccountValueStats,
+} from '../../services/AccountImportService';
 import { ImportTemplateService } from '../../services/ImportTemplateService';
 import { Logger } from '../../services/logger';
 import { parseAmount } from '../../utils/amounts';
 import FileDropzone from '../../components/Upload/FileDropzone';
 import ExcelSheetSelector from '../../components/Upload/ExcelSheetSelector';
 import ColumnMappingInterface from '../../components/Upload/ColumnMappingInterface';
+import MissingAccountsStep from '../../components/Upload/MissingAccountsStep';
+import MissingCategoriesStep from '../../components/Upload/MissingCategoriesStep';
 import ImportPreviewTable from '../../components/Upload/ImportPreviewTable';
-import ManualDataCreator from '../../components/Upload/ManualDataCreator';
+import ManualEditionTable from '../../components/Upload/ManualEditionTable';
 import CreateAccountModal from '../../components/Upload/CreateAccountModal';
 import ImportHelpModal from '../../components/Upload/ImportHelpModal';
 import SaveTemplateModal from '../../components/Upload/SaveTemplateModal';
 import TemplatePicker from '../../components/Upload/TemplatePicker';
 import UploadStepper, { UploadStepKey } from '../../components/Upload/UploadStepper';
 import ConfirmModal from '../../components/Common/ConfirmModal';
+import LatestImportsPanel, { LatestImportsGroup } from '../../components/Upload/LatestImportsPanel';
+import AccountEditModal from '../../components/Upload/AccountEditModal';
+import { ProfileService } from '../../services/ProfileService';
 
 type Step = UploadStepKey;
 
@@ -57,6 +72,14 @@ const UploadPage: React.FC = () => {
   const [accountId, setAccountId] = useState<number | ''>('');
   const [initialBalance, setInitialBalance] = useState('0');
   const [preview, setPreview] = useState<PreviewRow[]>([]);
+  const [missingCategories, setMissingCategories] = useState<CategoryValueStats[]>([]);
+  const [knownValueToCode, setKnownValueToCode] = useState<Record<string, string>>({});
+  const [uploadCategories, setUploadCategories] = useState<Category[]>([]);
+  const [uploadGroups, setUploadGroups] = useState<CategoryGroup[]>([]);
+  const [missingAccounts, setMissingAccounts] = useState<AccountValueStats[]>([]);
+  const [knownAccountToId, setKnownAccountToId] = useState<Record<string, number>>({});
+  const [knownAccountToCode, setKnownAccountToCode] = useState<Record<string, string>>({});
+  const [uploadAccounts, setUploadAccounts] = useState<Account[]>([]);
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -74,6 +97,20 @@ const UploadPage: React.FC = () => {
   const importedTotalRef = useRef(0);
   const skippedRef = useRef<string[]>([]);
   const sheetAssignmentRef = useRef<Record<string, number>>({});
+  const [latestGroups, setLatestGroups] = useState<LatestImportsGroup[]>([]);
+  const [editingGroup, setEditingGroup] = useState<LatestImportsGroup | null>(null);
+  const [deleteImportId, setDeleteImportId] = useState<number | null>(null);
+  const [deleteImportName, setDeleteImportName] = useState<string>('');
+  const [usageMode, setUsageMode] = useState<string>('tpe');
+
+  const reloadLatest = useCallback(async () => {
+    try {
+      const groups = await ImportService.listByAccount();
+      setLatestGroups(groups);
+    } catch (err) {
+      Logger.error('Upload.reloadLatest', err);
+    }
+  }, []);
 
   const reloadAccounts = useCallback(async () => {
     try {
@@ -94,7 +131,27 @@ const UploadPage: React.FC = () => {
   useEffect(() => {
     void reloadAccounts();
     void reloadTemplates();
-  }, [reloadAccounts, reloadTemplates]);
+    void reloadLatest();
+    void import('../../services/SettingsService').then((m) => {
+      const sid = m.SettingsService.current.activeProfileId;
+      if (!sid) return;
+      void ProfileService.list().then((pls) => {
+        const a = pls.find((p) => p.id === sid);
+        if (a) setUsageMode(a.usageMode ?? 'tpe');
+      });
+    });
+    // réagit aux changements de profil actif
+    void import('../../services/SettingsService').then((m) =>
+      m.SettingsService.subscribe((s) => {
+        const sid = s.activeProfileId;
+        if (!sid) return;
+        void ProfileService.list().then((pls) => {
+          const a = pls.find((p) => p.id === sid);
+          if (a) setUsageMode(a.usageMode ?? 'tpe');
+        });
+      })
+    );
+  }, [reloadAccounts, reloadTemplates, reloadLatest]);
 
   const reset = () => {
     setStep('select');
@@ -296,7 +353,43 @@ const UploadPage: React.FC = () => {
     await analyzeAndMap(file, assigned[0], sheetAssignment[assigned[0]]);
   };
 
-  const onMappingConfirm = (nextMapping: ColumnMappingConfig, roles: Map<number, ColumnRole>) => {
+  const continueToCategoriesOrPreview = async (
+    rows: PreviewRow[],
+    nextMapping: ColumnMappingConfig
+  ) => {
+    if (!analysis) return;
+    if (nextMapping.categoryColumnIndex !== undefined) {
+      const cats = await ConfigService.listCategories();
+      const grps = await ConfigService.listCategoryGroups();
+      const result = await CategoryImportService.analyzeMappedCategories(
+        analysis.structure,
+        nextMapping.categoryColumnIndex,
+        cats
+      );
+      const rowsWithCodes = applyCategoryCodesToRows(rows, result.valueToCode);
+      setPreview(rowsWithCodes);
+      setKnownValueToCode(result.valueToCode);
+      setUploadCategories(cats);
+      setUploadGroups(grps);
+      if (result.missing.length > 0) {
+        setMissingCategories(result.missing);
+        setStep('categories');
+        return;
+      }
+      setMissingCategories([]);
+      setStep('preview');
+      return;
+    }
+    setMissingCategories([]);
+    setKnownValueToCode({});
+    setPreview(rows);
+    setStep('preview');
+  };
+
+  const onMappingConfirm = async (
+    nextMapping: ColumnMappingConfig,
+    roles: Map<number, ColumnRole>
+  ) => {
     if (!analysis) return;
     const rows = transformRows(analysis.structure, nextMapping);
     if (rows.length === 0) {
@@ -306,19 +399,103 @@ const UploadPage: React.FC = () => {
     }
     setMapping(nextMapping);
     setLastRoles(roles);
+
+    setBusy(true);
+    try {
+      let working = rows;
+
+      if (nextMapping.accountColumnIndex !== undefined) {
+        const accs = await ConfigService.listAccounts();
+        const result = await AccountImportService.analyzeMappedAccounts(
+          analysis.structure,
+          nextMapping.accountColumnIndex,
+          accs
+        );
+        working = applyAccountIdsToRows(working, result.valueToId, result.valueToCode);
+        setPreview(working);
+        setKnownAccountToId(result.valueToId);
+        setKnownAccountToCode(result.valueToCode);
+        setUploadAccounts(accs);
+        if (result.missing.length > 0) {
+          setMissingAccounts(result.missing);
+          setStep('accounts');
+          return;
+        }
+        setMissingAccounts([]);
+      } else {
+        setMissingAccounts([]);
+        setKnownAccountToId({});
+        setKnownAccountToCode({});
+      }
+
+      await continueToCategoriesOrPreview(working, nextMapping);
+    } catch (err) {
+      Logger.error('Upload.onMappingConfirm', err);
+      toast.error(t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onAccountsResolved = async (
+    createdIds: Record<string, number>,
+    createdCodes: Record<string, string>
+  ) => {
+    if (!mapping) return;
+    const mergedIds = { ...knownAccountToId, ...createdIds };
+    const mergedCodes = { ...knownAccountToCode, ...createdCodes };
+    const rows = applyAccountIdsToRows(preview, mergedIds, mergedCodes);
+    setKnownAccountToId(mergedIds);
+    setKnownAccountToCode(mergedCodes);
+    setMissingAccounts([]);
     setPreview(rows);
+    setBusy(true);
+    try {
+      await continueToCategoriesOrPreview(rows, mapping);
+      await reloadAccounts();
+    } catch (err) {
+      Logger.error('Upload.onAccountsResolved', err);
+      toast.error(t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onCategoriesResolved = (createdMap: Record<string, string>) => {
+    const merged = { ...knownValueToCode, ...createdMap };
+    setPreview((prev) => applyCategoryCodesToRows(prev, merged));
+    setKnownValueToCode(merged);
+    setMissingCategories([]);
     setStep('preview');
   };
 
   const doImport = async () => {
-    if (accountId === '' || preview.length === 0) {
+    const fallbackAccountId = accountId === '' ? null : accountId;
+    const needsFallback = preview.some((r) => r.accountId == null);
+    if (preview.length === 0 || (needsFallback && fallbackAccountId == null)) {
       toast.error(t('upload.needAccount'));
       return;
     }
-    const dates = preview.map((r) => r.date).sort();
-    const overlaps = await ImportService.findOverlaps(accountId, dates[0], dates[dates.length - 1]);
-    if (overlaps.length > 0 && overlap === null) {
-      setOverlap(overlaps);
+    const effectiveFallback = fallbackAccountId ?? preview.find((r) => r.accountId != null)?.accountId;
+    if (effectiveFallback == null) {
+      toast.error(t('upload.needAccount'));
+      return;
+    }
+
+    const accountIds = new Set<number>();
+    for (const row of preview) {
+      accountIds.add(row.accountId ?? effectiveFallback);
+    }
+
+    const allOverlaps: OverlapWarning[] = [];
+    for (const aid of accountIds) {
+      const rowsForAcc = preview.filter((r) => (r.accountId ?? effectiveFallback) === aid);
+      const dates = rowsForAcc.map((r) => r.date).sort();
+      const found = await ImportService.findOverlaps(aid, dates[0], dates[dates.length - 1]);
+      allOverlaps.push(...found);
+    }
+    if (allOverlaps.length > 0 && overlap === null) {
+      setOverlap(allOverlaps);
       return;
     }
     setOverlap(null);
@@ -331,13 +508,15 @@ const UploadPage: React.FC = () => {
         ? `${file?.name ?? 'excel'} / ${currentSheet}`
         : file?.name ?? 'manuel.csv';
       const result = await ImportService.importRows({
-        accountId,
+        accountId: effectiveFallback,
         filename,
         rows: preview,
-        initialBalance: parseAmount(initialBalance),
+        initialBalance:
+          fallbackAccountId != null ? parseAmount(initialBalance) : undefined,
       });
       importedTotalRef.current += result.imported;
       setImportedCount(importedTotalRef.current);
+      await reloadLatest();
       const remaining = excelRemainingRef.current;
       if (remaining.length > 0 && file) {
         const next = remaining[0];
@@ -429,8 +608,8 @@ const UploadPage: React.FC = () => {
   };
 
   return (
-    <div className="upload-page space-y-6">
-      <div>
+    <div className="upload-page">
+      <div className="shrink-0">
         <h1 className="text-3xl font-bold" style={{ color: 'var(--invoicing-gray-900)' }}>
           {t('upload.title')}
         </h1>
@@ -439,44 +618,57 @@ const UploadPage: React.FC = () => {
         </p>
       </div>
 
-      <UploadStepper step={step} />
+      <div className="shrink-0">
+        <UploadStepper step={step} />
+      </div>
 
       {step === 'select' && (
-        <div className="space-y-4">
-          <TemplatePicker
-            templates={templates}
-            selectedId={selectedTemplateId}
-            onSelect={onSelectTemplateFromSelect}
-            onDelete={(id) => void handleDeleteTemplate(id)}
+        <div className="upload-page-select-grid">
+          <div className="space-y-4">
+            <TemplatePicker
+              templates={templates}
+              selectedId={selectedTemplateId}
+              onSelect={onSelectTemplateFromSelect}
+              onDelete={(id) => void handleDeleteTemplate(id)}
+            />
+            <div className="ct-card">
+              <FileDropzone onFiles={(files) => void handleFiles(files)} />
+            </div>
+            <div className="upload-or-divider text-sm" style={{ color: 'var(--invoicing-gray-500)' }}>
+              <span>{t('common.or')}</span>
+            </div>
+            <div className="ct-card text-center py-8">
+              <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--invoicing-gray-900)' }}>
+                {t('upload.manualCreateTitle')}
+              </h3>
+              <p className="ct-hint mb-6">{t('upload.manualCreateDesc')}</p>
+              <button className="ct-btn-primary" onClick={() => setStep('manual')}>
+                {t('upload.manual')}
+              </button>
+            </div>
+            <div className="upload-info-banner">
+              <h4 className="font-semibold mb-1">{t('upload.supportedFormats')}</h4>
+              <p className="text-sm opacity-90 mb-2">{t('upload.supportedFormatsDesc')}</p>
+              <p className="text-xs opacity-80">{t('upload.acceptedFormats')}</p>
+              <button
+                type="button"
+                className="mt-3 text-sm font-medium underline inline-flex items-center gap-1"
+                onClick={() => setHelpOpen(true)}
+              >
+                <HelpCircle size={14} />
+                {t('upload.importHelp.link')}
+              </button>
+            </div>
+          </div>
+          <LatestImportsPanel
+            groups={latestGroups}
+            canEditData={usageMode === 'familiale'}
+            onEditAccount={(g) => setEditingGroup(g)}
+            onDeleteImport={(id, name) => {
+              setDeleteImportId(id);
+              setDeleteImportName(name);
+            }}
           />
-          <div className="ct-card">
-            <FileDropzone onFiles={(files) => void handleFiles(files)} />
-          </div>
-          <div className="upload-or-divider text-sm" style={{ color: 'var(--invoicing-gray-500)' }}>
-            <span>{t('common.or')}</span>
-          </div>
-          <div className="ct-card text-center py-8">
-            <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--invoicing-gray-900)' }}>
-              {t('upload.manualCreateTitle')}
-            </h3>
-            <p className="ct-hint mb-6">{t('upload.manualCreateDesc')}</p>
-            <button className="ct-btn-primary" onClick={() => setStep('manual')}>
-              {t('upload.manual')}
-            </button>
-          </div>
-          <div className="upload-info-banner">
-            <h4 className="font-semibold mb-1">{t('upload.supportedFormats')}</h4>
-            <p className="text-sm opacity-90 mb-2">{t('upload.supportedFormatsDesc')}</p>
-            <p className="text-xs opacity-80">{t('upload.acceptedFormats')}</p>
-            <button
-              type="button"
-              className="mt-3 text-sm font-medium underline inline-flex items-center gap-1"
-              onClick={() => setHelpOpen(true)}
-            >
-              <HelpCircle size={14} />
-              {t('upload.importHelp.link')}
-            </button>
-          </div>
         </div>
       )}
 
@@ -591,7 +783,7 @@ const UploadPage: React.FC = () => {
           selectedTemplateId={selectedTemplateId}
           onChangeBalance={setInitialBalance}
           onSelectTemplate={onSelectTemplateFromSelect}
-          onConfirm={onMappingConfirm}
+          onConfirm={(mapping, roles) => void onMappingConfirm(mapping, roles)}
           onSaveTemplate={(roles) => {
             setLastRoles(roles);
             setSaveTplOpen(true);
@@ -608,18 +800,60 @@ const UploadPage: React.FC = () => {
         />
       )}
 
-      {step === 'manual' && (
-        <ManualDataCreator
-          onReady={(rows) => {
-            setPreview(rows);
-            setStep('preview');
-          }}
+      {step === 'accounts' && (
+        <MissingAccountsStep
+          missing={missingAccounts}
+          accounts={uploadAccounts}
+          onResolved={(ids, codes) => void onAccountsResolved(ids, codes)}
+          onBack={() => setStep('mapping')}
+          onIgnore={() => void handleIgnoreImport()}
+          ignoreHint={
+            remainingCount > 0
+              ? t('upload.ignoreThisImportHint', { count: remainingCount })
+              : importedCount > 0
+                ? t('upload.ignoreThisImportKeep')
+                : undefined
+          }
         />
+      )}
+
+      {step === 'categories' && (
+        <MissingCategoriesStep
+          missing={missingCategories}
+          categories={uploadCategories}
+          groups={uploadGroups}
+          onResolved={onCategoriesResolved}
+          onBack={() => setStep('mapping')}
+          onIgnore={() => void handleIgnoreImport()}
+          ignoreHint={
+            remainingCount > 0
+              ? t('upload.ignoreThisImportHint', { count: remainingCount })
+              : importedCount > 0
+                ? t('upload.ignoreThisImportKeep')
+                : undefined
+          }
+        />
+      )}
+
+      {step === 'manual' && (
+        <div className="upload-page-manual-wrap">
+          <ManualEditionTable
+            accounts={accounts}
+            onReady={(rows, accId) => {
+              setAccountId(accId);
+              const acc = accounts.find((a) => a.id === accId);
+              if (acc) setInitialBalance(String(acc.initialBalance));
+              setPreview(rows);
+              setStep('preview');
+            }}
+            onCancel={() => setStep('select')}
+          />
+        </div>
       )}
 
       {step === 'preview' && (
         <>
-          {accountId === '' && (
+          {accountId === '' && preview.some((r) => r.accountId == null) && (
             <div className="ct-card">
               <label className="ct-label max-w-sm">
                 {t('upload.account')}
@@ -752,6 +986,37 @@ const UploadPage: React.FC = () => {
         onConfirm={() => {
           setOverlap([]);
           void doImport();
+        }}
+      />
+      {editingGroup && (
+        <AccountEditModal
+          isOpen={!!editingGroup}
+          initial={editingGroup.account}
+          onClose={() => setEditingGroup(null)}
+          onSave={async (fields) => {
+            await ConfigService.updateAccount(editingGroup.account.id, fields);
+            await reloadAccounts();
+            await reloadLatest();
+            toast.success(t('common.success'));
+          }}
+        />
+      )}
+      <ConfirmModal
+        isOpen={deleteImportId !== null}
+        title={t('upload.deleteImportTitle')}
+        message={t('upload.deleteImportMessage', { name: deleteImportName })}
+        danger
+        onCancel={() => setDeleteImportId(null)}
+        onConfirm={() => {
+          const id = deleteImportId!;
+          setDeleteImportId(null);
+          void ImportService.deleteImport(id).then(() => {
+            void reloadLatest();
+            toast.success(t('common.success'));
+          }).catch((err) => {
+            Logger.error('Upload.deleteImport', err);
+            toast.error(t('common.error'));
+          });
         }}
       />
     </div>

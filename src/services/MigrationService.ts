@@ -5,6 +5,13 @@ import Papa from 'papaparse';
 import { tauriBridge } from './tauri';
 import { Db } from './db';
 import { Logger, withLog } from './logger';
+import { parseAmount } from '../utils/amounts';
+import {
+  groupHistoryRowsByAccountCode,
+  resolveInitialBalanceFromHistory,
+  type Comptal2HistoryRow,
+  type SoldeCompteRaw,
+} from '../utils/legacyInitialBalance';
 
 export interface MigrationAnalysis {
   valid: boolean;
@@ -22,25 +29,12 @@ export interface MigrationResult {
   invoicingImported: number;
 }
 
-interface Comptal2CsvRow {
+interface Comptal2CsvRow extends Comptal2HistoryRow {
   Source?: string;
-  Compte?: string;
-  Date?: string;
   'Date de valeur'?: string;
-  ['Débit']?: string;
-  ['Crédit']?: string;
   ['Libellé']?: string;
-  Solde?: string;
   ['catégorie']?: string;
-  ['Solde initial']?: string;
   Index?: string;
-}
-
-function parseAmount(raw: string | undefined): number {
-  if (!raw) return 0;
-  const cleaned = raw.replace(/[\s\u00a0€]/g, '').replace(',', '.');
-  const value = parseFloat(cleaned);
-  return Number.isFinite(value) ? value : 0;
 }
 
 /** dd/MM/yyyy -> yyyy-MM-dd (accepte aussi une date déjà ISO). */
@@ -68,6 +62,34 @@ async function readJsonExternal<T>(abs: string): Promise<T | null> {
 function joinAbs(base: string, ...parts: string[]): string {
   const root = base.replace(/\\/g, '/').replace(/\/$/, '');
   return parts.reduce((acc, part) => `${acc}/${part.replace(/^\/+/, '')}`, root);
+}
+
+async function loadLegacyHistoryFiles(sourceAbs: string): Promise<{
+  files: Array<{ fileName: string; rows: Comptal2CsvRow[] }>;
+  soldesJson: Record<string, SoldeCompteRaw>;
+}> {
+  const parametreDir = joinAbs(sourceAbs, 'parametre');
+  const dataDir = joinAbs(sourceAbs, 'data');
+  const soldesJson =
+    (await readJsonExternal<Record<string, SoldeCompteRaw>>(
+      joinAbs(parametreDir, 'solde_compte.json')
+    )) ?? {};
+  const files: Array<{ fileName: string; rows: Comptal2CsvRow[] }> = [];
+  if (!(await tauriBridge.externalExists(dataDir))) {
+    return { files, soldesJson };
+  }
+  const dataEntries = await tauriBridge.readExternalDir(dataDir);
+  const csvFiles = dataEntries.filter((e) => !e.isDir && e.name.toLowerCase().endsWith('.csv'));
+  for (const file of csvFiles) {
+    const content = await tauriBridge.readExternalTextFile(joinAbs(dataDir, file.name));
+    const parsed = Papa.parse<Comptal2CsvRow>(content, {
+      header: true,
+      delimiter: ';',
+      skipEmptyLines: true,
+    });
+    files.push({ fileName: file.name, rows: parsed.data });
+  }
+  return { files, soldesJson };
 }
 
 /** Chemin absolu du dossier profil Comptal2.1 (profils/{id}). */
@@ -220,6 +242,24 @@ export const MigrationService = {
       }
       const txRows = await Db.select<{ c: number }>('SELECT COUNT(*) AS c FROM transactions');
       if ((txRows[0]?.c ?? 0) > 0) {
+        const markerRel = `profils/${profileId}/parametre/.c21_oldest_history_initial`;
+        const alreadyApplied = await tauriBridge.pathExists(markerRel);
+        if (!alreadyApplied) {
+          const updated = await this.applyOldestHistoryInitialBalances(abs);
+          try {
+            await tauriBridge.writeTextFile(markerRel, new Date().toISOString());
+          } catch {
+            Logger.warn(
+              'MigrationService.migrateLegacyProfileIfNeeded',
+              'Marqueur de solde initial non écrit'
+            );
+          }
+          Logger.info(
+            'MigrationService.migrateLegacyProfileIfNeeded',
+            'Soldes initiaux recalés sur la plus ancienne ligne d’historique',
+            { updated }
+          );
+        }
         return null;
       }
       const analysis = await this.analyze(abs);
@@ -230,7 +270,19 @@ export const MigrationService = {
         );
         return null;
       }
-      return this.migrate(abs);
+      const result = await this.migrate(abs);
+      try {
+        await tauriBridge.writeTextFile(
+          `profils/${profileId}/parametre/.c21_oldest_history_initial`,
+          new Date().toISOString()
+        );
+      } catch {
+        Logger.warn(
+          'MigrationService.migrateLegacyProfileIfNeeded',
+          'Marqueur de solde initial non écrit'
+        );
+      }
+      return result;
     }, { data: { profileId } });
   },
 
@@ -256,21 +308,10 @@ export const MigrationService = {
         (await readJsonExternal<Record<string, { name: string; color: string }>>(
           joinAbs(parametreDir, 'account.json')
         )) ?? {};
-      const soldesJson =
-        (await readJsonExternal<Record<string, number | { solde?: number }>>(
-          joinAbs(parametreDir, 'solde_compte.json')
-        )) ?? {};
       for (const [code, info] of Object.entries(accountsJson)) {
-        const soldeRaw = soldesJson[code];
-        const initial =
-          typeof soldeRaw === 'number'
-            ? soldeRaw
-            : typeof soldeRaw === 'object' && typeof soldeRaw?.solde === 'number'
-              ? soldeRaw.solde
-              : 0;
         const inserted = await Db.execute(
           'INSERT OR IGNORE INTO accounts (code, name, color, initial_balance) VALUES (?, ?, ?, ?)',
-          [code, info.name ?? code, info.color ?? '#4a90e2', initial]
+          [code, info.name ?? code, info.color ?? '#4a90e2', 0]
         );
         result.accountsCreated += inserted.rowsAffected;
       }
@@ -341,15 +382,6 @@ export const MigrationService = {
           byCode.set(code, accountId);
         }
 
-        // Solde initial depuis le CSV si le compte n'en a pas
-        const initialFromCsv = parseAmount(rows[0]['Solde initial']);
-        if (initialFromCsv !== 0) {
-          await Db.execute(
-            'UPDATE accounts SET initial_balance = ? WHERE id = ? AND initial_balance = 0',
-            [initialFromCsv, accountId]
-          );
-        }
-
         // Enregistrement d'import
         const dates = rows
           .map((r) => parseDateToIso(r.Date))
@@ -408,6 +440,9 @@ export const MigrationService = {
 
       Logger.info('MigrationService.migrate', 'Migration CSV terminée', result);
 
+      onProgress?.('Soldes initiaux (plus ancienne ligne d’historique)…');
+      await this.applyOldestHistoryInitialBalances(sourceAbs);
+
       onProgress?.('Migration facturation / association…');
       result.invoicingImported = await importInvoicingJson(parametreDir);
 
@@ -416,6 +451,51 @@ export const MigrationService = {
       Logger.info('MigrationService.migrate', 'Stats auto-cat reconstruites', { statsCount });
 
       return result;
+    }, { data: { sourceAbs } });
+  },
+
+  /**
+   * Pour chaque compte, pose `initial_balance` à partir de la plus ancienne
+   * ligne CSV (colonne « Solde initial » ou Solde − mouvement), avec repli
+   * sur l’entrée la plus ancienne de `solde_compte.json`.
+   */
+  async applyOldestHistoryInitialBalances(sourceAbs: string): Promise<number> {
+    return withLog('MigrationService.applyOldestHistoryInitialBalances', async () => {
+      const { files, soldesJson } = await loadLegacyHistoryFiles(sourceAbs);
+      const accounts = await Db.select<{
+        id: number;
+        code: string;
+        name: string;
+        initial_balance: number;
+      }>('SELECT id, code, name, initial_balance FROM accounts');
+      const grouped = groupHistoryRowsByAccountCode(files, accounts);
+      const soldesByUpper = new Map(
+        Object.entries(soldesJson).map(([code, raw]) => [code.toUpperCase(), raw])
+      );
+      let updated = 0;
+      for (const account of accounts) {
+        const key = account.code.toUpperCase();
+        const rows = grouped.get(key) ?? [];
+        const soldeRaw = soldesByUpper.get(key);
+        if (rows.length === 0 && (soldeRaw === undefined || soldeRaw === null)) {
+          continue;
+        }
+        const next = resolveInitialBalanceFromHistory(rows, soldeRaw);
+        if (Math.abs(next - (account.initial_balance ?? 0)) < 0.0001) {
+          continue;
+        }
+        await Db.execute('UPDATE accounts SET initial_balance = ? WHERE id = ?', [
+          next,
+          account.id,
+        ]);
+        updated += 1;
+        Logger.info(
+          'MigrationService.applyOldestHistoryInitialBalances',
+          `Solde initial ${account.code} ← plus ancienne ligne`,
+          { from: account.initial_balance, to: next, historyRows: rows.length }
+        );
+      }
+      return updated;
     }, { data: { sourceAbs } });
   },
 };

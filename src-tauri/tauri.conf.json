@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Comptal2.1",
-  "version": "2.1.0",
+  "version": "2.1.2",
   "identifier": "com.leopaul.comptal21",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -30,7 +30,7 @@
     "active": true,
     "targets": ["nsis", "deb", "rpm"],
     "publisher": "Leopaul",
-    "homepage": "https://github.com/LeopaulV/Comptal2",
+    "homepage": "https://github.com/AllData-Allergen/Comptal2",
     "copyright": "Copyright © 2026 Leopaul",
     "license": "MIT",
     "category": "Finance",
@@ -76,7 +76,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZCNkZEQjQ0RjY5MUUyNTUKUldSVjRwSDJSTnR2YTZTWmFVdWNQNE5PRjFUR1JxeEI2LzF5K3VGTEpKejRDR1ozNGR1MlZHZGsK",
       "endpoints": [
-        "https://github.com/LeopaulV/Comptal2/releases/latest/download/latest.json"
+        "https://github.com/AllData-Allergen/Comptal2/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

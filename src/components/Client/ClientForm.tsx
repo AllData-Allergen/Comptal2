@@ -82,7 +82,7 @@ const ClientForm: React.FC<ClientFormProps> = ({
                 : (client.roles ?? []).filter((role) => role !== 'client'),
             })}
           />
-          <span><strong>Client</strong><small>Devis, factures et paiements</small></span>
+          <span><strong>{t('clients.roleClient')}</strong><small>{t('clients.roleClientHint')}</small></span>
         </label>
         <label>
           <input
@@ -94,7 +94,7 @@ const ClientForm: React.FC<ClientFormProps> = ({
                 : (client.roles ?? []).filter((role) => role !== 'donateur'),
             })}
           />
-          <span><strong>Donateur</strong><small>Dons, transactions et reçus fiscaux</small></span>
+          <span><strong>{t('clients.roleDonor')}</strong><small>{t('clients.roleDonorHint')}</small></span>
         </label>
       </div>
       <label className="org-field">

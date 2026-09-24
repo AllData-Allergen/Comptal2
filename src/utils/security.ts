@@ -105,7 +105,44 @@ export function detectAllowedUserFile(bytes: Uint8Array): { mime: string } | nul
   ) {
     return { mime: 'image/webp' };
   }
+  // Outlook .msg (OLE Compound File)
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0xd0 &&
+    bytes[1] === 0xcf &&
+    bytes[2] === 0x11 &&
+    bytes[3] === 0xe0
+  ) {
+    return { mime: 'application/vnd.ms-outlook' };
+  }
+  // .eml / message RFC822 — en-têtes texte courants
+  if (looksLikeEmailMessage(bytes)) {
+    return { mime: 'message/rfc822' };
+  }
   return null;
+}
+
+function looksLikeEmailMessage(bytes: Uint8Array): boolean {
+  const sampleLen = Math.min(bytes.length, 512);
+  if (sampleLen < 8) return false;
+  let text = '';
+  for (let i = 0; i < sampleLen; i += 1) {
+    const b = bytes[i]!;
+    if (b === 0) return false;
+    if (b < 9 || (b > 13 && b < 32)) return false;
+    text += String.fromCharCode(b);
+  }
+  const head = text.toLowerCase();
+  return (
+    head.startsWith('from:') ||
+    head.startsWith('received:') ||
+    head.startsWith('return-path:') ||
+    head.startsWith('mime-version:') ||
+    head.startsWith('date:') ||
+    head.startsWith('subject:') ||
+    head.includes('\nfrom:') ||
+    head.includes('\nreceived:')
+  );
 }
 
 export function assertProfileRel(rel: string, profileId: string): string {

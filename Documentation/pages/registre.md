@@ -63,5 +63,5 @@ La numérotation suit `numberFormat` (ex. `{PREFIX}-{YEAR}-{SEQ:4}`).
 ## 5. Voir aussi
 
 - [Carte Registre](../cartes/registre.md)
-- [Page Association](./association.md) — reçus fiscaux
+- [Page Dons](./dons.md) — émission des reçus fiscaux
 - [Page Paramètres](./parametre.md) — panneau Registres et PDF

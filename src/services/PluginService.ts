@@ -360,7 +360,18 @@ async function applyImportMapper(manifest: PluginManifest, mapper: PluginImportM
   const templates = await ImportTemplateService.list();
   const name = (mapper.name || manifest.name).trim();
   if (templates.some((t) => t.name === name)) return;
-  const allowed = new Set<ColumnRole>(['date', 'dateValue', 'libelle', 'debit', 'credit', 'debitCredit', 'balance', 'ignore']);
+  const allowed = new Set<ColumnRole>([
+    'date',
+    'dateValue',
+    'libelle',
+    'debit',
+    'credit',
+    'debitCredit',
+    'balance',
+    'category',
+    'account',
+    'ignore',
+  ]);
   const columnRoles: ColumnRolesByHeader = {};
   for (const [key, value] of Object.entries(mapper.columnRoles ?? {})) {
     if (typeof value === 'string' && allowed.has(value as ColumnRole)) {

@@ -11,6 +11,10 @@ import {
 } from '../types/register';
 import i18n from '../i18n/config';
 import { AttachmentService } from './AttachmentService';
+import {
+  AmortissementService,
+  calculateAmortissementCumule,
+} from './AmortissementService';
 import { Db } from './db';
 import { withLog } from './logger';
 import { sqlTxActive } from '../utils/sqlTx';
@@ -330,6 +334,68 @@ async function annualSnapshot(start: string, end: string): Promise<RegisterSnaps
   };
 }
 
+async function amortissementSnapshot(start: string, end: string): Promise<RegisterSnapshot> {
+  const settings = await AmortissementService.getSettings();
+  const articles = await AmortissementService.list();
+  const endDate = new Date(`${end}T23:59:59`);
+  const startMinus = new Date(new Date(`${start}T00:00:00`).getTime() - 1);
+
+  const mapped = articles
+    .filter((article) => {
+      const mes = article.dateMiseEnService || article.dateAcquisition;
+      if (mes > end) return false;
+      if (article.statut === 'cede' || article.statut === 'mis_au_rebut') {
+        if (article.dateCession && article.dateCession < start) return false;
+      }
+      return true;
+    })
+    .map((article) => {
+      const amortiFin = calculateAmortissementCumule(article, endDate, settings);
+      const amortiDebut = calculateAmortissementCumule(article, startMinus, settings);
+      const periodCharge = Math.max(0, Math.round((amortiFin - amortiDebut) * 100) / 100);
+      const vnc = Math.max(0, Math.round((article.valeurAcquisitionHT - amortiFin) * 100) / 100);
+      const typeLabel = i18n.t(`amortissement.types.${article.typeImmobilisation}`, {
+        defaultValue: article.typeImmobilisation,
+      });
+      const methodLabel = i18n.t(`amortissement.methods.${article.methode}`, {
+        defaultValue: article.methode,
+      });
+      return {
+        label: article.designation,
+        detail: [
+          typeLabel,
+          article.reference,
+          article.dateMiseEnService
+            ? `${i18n.t('amortissement.serviceDate', { defaultValue: 'MES' })} ${article.dateMiseEnService}`
+            : '',
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        extra: `${methodLabel} · ${article.dureeAnnees} ${i18n.t('amortissement.years', { defaultValue: 'ans' })}`,
+        status: article.statut,
+        credit: article.valeurAcquisitionHT,
+        debit: Math.round(amortiFin * 100) / 100,
+        periodCharge,
+        amount: vnc,
+      };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, i18n.language));
+
+  return {
+    registerType: 'amortissement_register',
+    periodStart: start,
+    periodEnd: end,
+    rows: mapped,
+    totals: {
+      immoCount: mapped.length,
+      immoBrut: mapped.reduce((sum, row) => sum + Number(row.credit ?? 0), 0),
+      immoAmorti: mapped.reduce((sum, row) => sum + Number(row.debit ?? 0), 0),
+      immoDotation: mapped.reduce((sum, row) => sum + Number(row.periodCharge ?? 0), 0),
+      immoVnc: mapped.reduce((sum, row) => sum + Number(row.amount ?? 0), 0),
+    },
+  };
+}
+
 async function buildSnapshot(
   type: RegisterDocumentType,
   start: string,
@@ -340,7 +406,8 @@ async function buildSnapshot(
   if (type === 'donation_journal') return donationSnapshot(start, end);
   if (type === 'tax_receipt_register') return receiptSnapshot(start, end);
   if (type === 'annual_donation_statement') return annualSnapshot(start, end);
-  return { periodStart: start, periodEnd: end, rows: [], totals: {} };
+  if (type === 'amortissement_register') return amortissementSnapshot(start, end);
+  return { periodStart: start, periodEnd: end, rows: [], totals: {}, registerType: type };
 }
 
 async function children<T>(
@@ -483,6 +550,7 @@ export const RegisterService = {
       const storageType = ['reference', 'invoice_summary', 'cashflow_summary'].includes(input.type)
         ? input.type
         : 'reference';
+      // amortissement_register & types association : stockés en `reference`, type réel dans snapshot.registerType
       await Db.inTransaction('RegisterService.generate', async () => {
         await Db.execute(
           `INSERT INTO register_documents
@@ -555,11 +623,16 @@ export const RegisterService = {
 
   async addAttachment(documentId: string | null, file: File): Promise<void> {
     const saved = await AttachmentService.saveUserFile(file);
-    await Db.execute(
-      `INSERT INTO register_attachments
-       (id, document_id, name, path, mime_type, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-      [id('attachment'), documentId, saved.name, saved.rel, saved.mimeType, new Date().toISOString()]
-    );
+    try {
+      await Db.execute(
+        `INSERT INTO register_attachments
+         (id, document_id, name, path, mime_type, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        [id('attachment'), documentId, saved.name, saved.rel, saved.mimeType, new Date().toISOString()]
+      );
+    } catch (err) {
+      await AttachmentService.deleteRel(saved.rel).catch(() => undefined);
+      throw err;
+    }
   },
 
   async listRegisterAttachments(): Promise<RegisterAttachment[]> {

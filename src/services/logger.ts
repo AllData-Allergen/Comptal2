@@ -77,7 +77,7 @@ export const Logger = {
       session = {
         sessionId: `${stamp}_browser`,
         dataRoot: '',
-        appVersion: '2.1.0',
+        appVersion: '2.1.2',
         dev: true,
       };
     }

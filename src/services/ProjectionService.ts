@@ -9,7 +9,7 @@ import {
   isAfter,
   isBefore,
   isSameDay,
-  parseISO,
+  isValid,
   startOfDay,
 } from 'date-fns';
 import {
@@ -24,9 +24,10 @@ import {
   ProjectionData,
   ProjectionStats,
 } from '../types/forecast';
+import { forecastIsoToDate, parseForecastIso } from '../utils/forecastDates';
 import { getPeriodKey } from '../utils/periodKeys';
 import { MAX_PROJECTION_DAYS } from '../utils/security';
-import { withLog } from './logger';
+import { Logger, withLog } from './logger';
 
 function nextDate(date: Date, periodicity: Periodicity): Date {
   switch (periodicity) {
@@ -51,8 +52,17 @@ function periodKeyLegacy(date: Date, granularity: ChartGranularity): string {
   return getPeriodKey(date, granularity);
 }
 
-function toStart(value: string | Date): Date {
-  return startOfDay(value instanceof Date ? value : parseISO(value));
+/** Début de jour valide, ou null si parsing cassé / date invalide (anti-crash). */
+function toStart(value: string | Date | null | undefined): Date | null {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) {
+    if (!isValid(value)) return null;
+    const d = startOfDay(value);
+    return isValid(d) ? d : null;
+  }
+  const iso = parseForecastIso(value);
+  if (!iso) return null;
+  return forecastIsoToDate(iso);
 }
 
 export function getAllFlatSubscriptions(
@@ -84,11 +94,13 @@ export function getAllGroupLines(group: ProjectSubscription): ProjectSubscriptio
 
 export function applySubscriptionToDate(subscription: ProjectSubscription, date: Date): number {
   const checkDate = startOfDay(date);
+  if (!isValid(checkDate)) return 0;
   const start = toStart(subscription.startDate);
+  if (!start) return 0;
   if (isBefore(checkDate, start)) return 0;
   if (subscription.endDate) {
     const end = toStart(subscription.endDate);
-    if (isAfter(checkDate, end)) return 0;
+    if (end && isAfter(checkDate, end)) return 0;
   }
 
   if (!(PERIODICITY_VALUES as readonly string[]).includes(subscription.periodicity)) return 0;
@@ -138,12 +150,26 @@ export function calculateProjection(
   const results: ProjectionData[] = [];
   const startDate = toStart(config.startDate);
   let endDate = toStart(config.endDate);
+  if (!startDate || !endDate) {
+    Logger.error(
+      'ProjectionService.calculateProjection',
+      new Error('Plage de dates invalide'),
+      `start=${String(config.startDate)} end=${String(config.endDate)}`
+    );
+    return results;
+  }
   if (isAfter(startDate, endDate)) return results;
   const maxEnd = addDays(startDate, MAX_PROJECTION_DAYS - 1);
   if (isAfter(endDate, maxEnd)) endDate = maxEnd;
 
   const flatSubscriptions = getAllFlatSubscriptions(subscriptions);
-  const dates = eachDayOfInterval({ start: startDate, end: endDate });
+  let dates: Date[];
+  try {
+    dates = eachDayOfInterval({ start: startDate, end: endDate });
+  } catch (err) {
+    Logger.error('ProjectionService.calculateProjection', err, 'eachDayOfInterval');
+    return results;
+  }
   let currentBalance = config.initialBalance;
   let cumulativeImpact = 0;
 
@@ -256,8 +282,16 @@ export const ProjectionService = {
     rangeStart?: string,
     rangeEnd?: string
   ): ProjectedCategoryPoint[] {
-    const start = startOfDay(parseISO(rangeStart ?? project.startDate));
-    let end = startOfDay(parseISO(rangeEnd ?? project.endDate));
+    const start = toStart(rangeStart ?? project.startDate);
+    let end = toStart(rangeEnd ?? project.endDate);
+    if (!start || !end) {
+      Logger.error(
+        'ProjectionService.calculateByCategory',
+        new Error('Plage de dates invalide'),
+        `start=${String(rangeStart ?? project.startDate)} end=${String(rangeEnd ?? project.endDate)}`
+      );
+      return [];
+    }
     if (isAfter(start, end)) return [];
     const maxEnd = addDays(start, MAX_PROJECTION_DAYS - 1);
     if (isAfter(end, maxEnd)) end = maxEnd;
@@ -265,16 +299,18 @@ export const ProjectionService = {
     const leaves = getAllFlatSubscriptions(subscriptions);
 
     for (const sub of leaves) {
-      let current = startOfDay(parseISO(sub.startDate));
-      if (isAfter(start, current) && sub.periodicity === 'unique') continue;
+      const subStart = toStart(sub.startDate);
+      if (!subStart) continue;
+      if (isAfter(start, subStart) && sub.periodicity === 'unique') continue;
 
-      current = startOfDay(parseISO(sub.startDate));
-      const hardEnd = sub.endDate
-        ? (isAfter(toStart(sub.endDate), end) ? end : toStart(sub.endDate))
-        : end;
+      let current = subStart;
+      const subEnd = sub.endDate ? toStart(sub.endDate) : null;
+      const hardEnd = subEnd && !isAfter(subEnd, end) ? subEnd : end;
+      if (isAfter(current, hardEnd)) continue;
       let guard = 0;
       while (!isAfter(current, hardEnd) && guard < 4000) {
         guard += 1;
+        if (!isValid(current)) break;
         if (!isAfter(start, current) && !isAfter(current, end)) {
           const amount = applySubscriptionToDate(sub, current);
           if (amount !== 0) {

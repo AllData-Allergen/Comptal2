@@ -7,6 +7,8 @@ export type UploadStepKey =
   | 'sheets'
   | 'analyzing'
   | 'mapping'
+  | 'accounts'
+  | 'categories'
   | 'preview'
   | 'manual'
   | 'uploading'
@@ -21,6 +23,8 @@ const STEP_PROGRESS: Record<UploadStepKey, number> = {
   config: 1,
   analyzing: 2,
   mapping: 2,
+  accounts: 2,
+  categories: 2,
   preview: 3,
   manual: 3,
   uploading: 4,

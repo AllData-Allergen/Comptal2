@@ -13,15 +13,20 @@ import {
 } from '../../utils/chartPastel';
 import '../../utils/registerCharts';
 import FinanceInsightKpis from './FinanceInsightKpis';
+import FinanceExcelExportButton from './FinanceExcelExportButton';
+import { ChartGranularity } from '../../types/projection';
+import { periodXTicks } from '../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../Common/ScrollablePeriodChart';
 
 interface FacturationTabProps {
   data: InvoicingInsights;
+  granularity: ChartGranularity;
 }
 
 const AGING_KEYS = ['current', 'd1to30', 'd31to60', 'd61to90', 'd90plus'] as const;
 const AGING_PASTELS = ['green', 'blue', 'yellow', 'orange', 'red'] as const;
 
-const FacturationTab: React.FC<FacturationTabProps> = ({ data }) => {
+const FacturationTab: React.FC<FacturationTabProps> = ({ data, granularity }) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -78,7 +83,7 @@ const FacturationTab: React.FC<FacturationTabProps> = ({ data }) => {
         },
       },
       scales: {
-        x: { ticks: { color: axis, maxRotation: 45 }, grid: { color: grid } },
+        x: { ticks: { ...periodXTicks(granularity, axis) }, grid: { color: grid } },
         y: {
           beginAtZero: true,
           ticks: { color: axis, callback: (value) => formatMoney(Number(value)) },
@@ -86,7 +91,7 @@ const FacturationTab: React.FC<FacturationTabProps> = ({ data }) => {
         },
       },
     }),
-    [axis, grid, tooltip, data.series, t]
+    [axis, grid, tooltip, data.series, t, granularity]
   );
 
   const agingTotal =
@@ -139,8 +144,38 @@ const FacturationTab: React.FC<FacturationTabProps> = ({ data }) => {
     data.series.labels.length > 0 &&
     (data.series.invoiced.some((value) => value > 0) || data.series.collected.some((value) => value > 0));
 
+  const exportRows = useMemo(() => {
+    const seriesRows = data.series.labels.map((label, i) => [
+      label,
+      data.series.invoiced[i] ?? 0,
+      data.series.collected[i] ?? 0,
+    ]);
+    const agingRows = AGING_KEYS.map((key) => [
+      t(`dashboard.invoicing.aging.${key}`),
+      data.aging[key] ?? 0,
+    ]);
+    return {
+      series: seriesRows,
+      aging: agingRows,
+    };
+  }, [data, t]);
+
   return (
     <div className="finance-insight-tab">
+      <FinanceExcelExportButton
+        fileName="finance_facturation"
+        sheetName={t('financeGlobal.facturationTab')}
+        headers={[
+          t('financeGlobal.period'),
+          t('dashboard.invoicing.invoiced'),
+          t('dashboard.invoicing.collected'),
+        ]}
+        rows={
+          exportRows.series.length > 0
+            ? exportRows.series
+            : exportRows.aging.map(([label, amount]) => [label, amount, ''])
+        }
+      />
       <FinanceInsightKpis
         items={[
           {
@@ -171,7 +206,9 @@ const FacturationTab: React.FC<FacturationTabProps> = ({ data }) => {
           <h3>{t('financeGlobal.invoicedVsCollected')}</h3>
           {hasSeries ? (
             <div className="finance-insight-canvas">
-              <Line data={lineData} options={lineOptions} />
+              <ScrollablePeriodChart granularity={granularity} labelCount={data.series.labels.length}>
+                <Line data={lineData} options={lineOptions} />
+              </ScrollablePeriodChart>
             </div>
           ) : (
             <p className="finance-empty-inline">{t('dashboard.noChartData')}</p>

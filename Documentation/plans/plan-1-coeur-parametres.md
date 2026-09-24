@@ -33,5 +33,5 @@ Poser la fondation de Comptal2.1 : projet Tauri 2 + React 18 + TypeScript + Vite
 
 ## Reste à faire (hors périmètre plans 2-5)
 
-- Endpoint updater : `https://github.com/LeopaulV/Comptal2/releases/latest/download/latest.json`. Signature locale : `TAURI_SIGNING_PRIVATE_KEY_PATH=src-tauri/keys/comptal21.key`. Publication : tag `vX.Y.Z` + workflow `.github/workflows/release-windows.yml`.
+- Renseigner le vrai dépôt GitHub dans `tauri.conf.json > plugins.updater.endpoints` et publier `latest.json` à chaque release (`tauri build` avec `TAURI_SIGNING_PRIVATE_KEY_PATH=src-tauri/keys/comptal21.key`).
 - Onboarding première utilisation (équivalent GuidedTour de Comptal2) si souhaité.

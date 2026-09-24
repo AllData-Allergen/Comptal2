@@ -9,6 +9,7 @@
     "clients": "Kontakte",
     "association": "Spendenverwaltung",
     "register": "Register",
+    "amortissement": "Abschreibung",
     "settings": "Einstellungen",
     "expand": "Menü ausklappen",
     "collapse": "Menü einklappen",
@@ -42,6 +43,12 @@
     "categoryXProtected": "Geschützt",
     "refresh": "Aktualisieren",
     "hide": "Ausblenden",
+    "duplicate": "Zeile duplizieren",
+    "copy": "Kopieren",
+    "paste": "Einfügen",
+    "deleteSelection": "Auswahl löschen",
+    "showDetails": "Details",
+    "settings": "Einstellungen",
     "clear": "Leeren",
     "choose": "Wählen…",
     "from": "Von",
@@ -70,6 +77,11 @@
     "sort": "Sortieren",
     "openPdf": "PDF öffnen",
     "openPdfFail": "Das PDF konnte nicht geöffnet werden."
+  },
+  "categoryAgg": {
+    "label": "Aggregation",
+    "category": "Kategorie",
+    "group": "Gruppierung"
   },
   "settings": {
     "title": "Einstellungen",
@@ -111,13 +123,21 @@
       "export": "Exportieren (ZIP)",
       "import": "Profil importieren (ZIP)",
       "deleteConfirmTitle": "Profil löschen",
-      "deleteConfirmMessage": "Alle Daten dieses Profils (Konten, Buchungen, Kontakte, Fakturierung, Spenden, PDFs, Anhänge) werden unwiderruflich gelöscht.",
+      "deleteConfirmMessage": "Alle Daten dieses Profils (Konten, Buchungen, Kontakte, Fakturierung, Spenden, PDFs, Anhänge) werden unwiderruflich gelöscht. Belege sollten 10 Jahre aufbewahrt werden; bei vorzeitiger Vernichtung kann CGI Art. 1734 gelten.",
       "created": "Profil erstellt",
       "imported": "Profil importiert",
+      "importing": "Import läuft…",
       "exported": "Profil exportiert",
       "deleted": "Profil gelöscht",
       "activated": "Profil aktiviert",
       "usageUpdated": "Nutzungsmodus aktualisiert (Menüs angepasst)",
+      "locked": "Gesperrtes Profil",
+      "lockedBadge": "Gesperrt",
+      "lockAction": "Endgültig sperren",
+      "lockAtCreate": "Endgültig in {{mode}} sperren",
+      "lockConfirmTitle": "Modus sperren?",
+      "lockConfirmMessage": "Der Wechsel zu {{mode}} wird endgültig (Fakturierung/Spenden/Register je nach Modus gesperrt). Dies ist unwiderruflich.",
+      "lockConfirmAction": "Sperren",
       "usage": {
         "familiale": "Privat / Familie",
         "tpe": "KMU / Rechnungen",
@@ -130,7 +150,7 @@
       "initialBalance": "Anfangssaldo",
       "addAccount": "Konto hinzufügen",
       "deleteConfirmTitle": "Konto löschen",
-      "deleteConfirmMessage": "Dieses Konto enthält {{count}} Buchung(en), die ebenfalls gelöscht werden.",
+      "deleteConfirmMessage": "Dieses Konto enthält {{count}} Buchung(en), die ebenfalls ausgeblendet werden. Empfohlene Aufbewahrung: 10 Jahre (CGI Art. 1734).",
       "empty": "Kein Konto. Legen Sie Ihr erstes Bankkonto an.",
       "paletteApplied": "Palette auf {{count}} Konto/Konten angewendet."
     },
@@ -212,6 +232,9 @@
       "location": "Speicherort der Daten",
       "openFolder": "Ordner öffnen",
       "exportAccountant": "Export für Steuerberater (Treasury-CSV, kein FEC)",
+      "exportCumulative": "Alle Daten exportieren (Excel)",
+      "exportCumulativeHint": "Kumulierte Excel-Arbeitsmappe: Konten, Kategorien, Buchungen, Kontakte, Rechnungen, Spenden, Anlagen.",
+      "exportedExcel": "Kumulierter Excel-Export gespeichert",
       "migration": "Migration von Comptal2",
       "migrationHint": "Importiert ein Comptal2-Profil (Ordner mit « parametre » und « data ») in das aktive Profil: Konten, Kategorien, CSV-Buchungen, Fakturierung und Vereinsdaten werden nach SQLite übernommen.",
       "migrationPick": "Comptal2-Ordner wählen…",
@@ -221,8 +244,8 @@
       "dangerZone": "Gefahrenzone",
       "clearTransactions": "Alle Buchungen leeren",
       "clearTransactionsConfirmTitle": "Buchungen leeren",
-      "clearTransactionsConfirmMessage": "Alle Buchungen des aktiven Profils werden gelöscht. Konten und Kategorien bleiben erhalten.",
-      "cleared": "Buchungen gelöscht",
+      "clearTransactionsConfirmMessage": "Die Buchungen des aktiven Profils werden ausgeblendet (10 Jahre Aufbewahrung, keine physische Löschung). Konten und Kategorien bleiben erhalten. Die vorzeitige Vernichtung von Belegen kann unter CGI Art. 1734 fallen.",
+      "cleared": "Buchungen archiviert (in Ansichten ausgeblendet)",
       "resetAutocat": "Auto-Kategorisierung zurücksetzen",
       "autocatReset": "Statistiken der Auto-Kategorisierung zurückgesetzt",
       "rebuildAutocat": "Auto-Kat-Statistiken neu aufbauen",
@@ -242,10 +265,7 @@
       "download": "Herunterladen und installieren",
       "downloading": "Download… {{percent}} %",
       "installing": "Installation… Die Anwendung wird neu gestartet.",
-      "updateError": "Prüfung nicht möglich (offline oder keine veröffentlichte Version).",
-      "profilesPreserved": "Updates ersetzen nur das Programm. Profile, Datenbanken und Anhänge bleiben im Windows-Datenordner (%APPDATA%) und werden nicht gelöscht.",
-      "autoUpdateStart": "Update v{{version}} verfügbar. Installation läuft (Profile bleiben erhalten)…",
-      "autoUpdating": "Update v{{version}} wird heruntergeladen… {{percent}} %"
+      "updateError": "Prüfung nicht möglich (offline oder keine veröffentlichte Version)."
     },
     "plugins": {
       "title": "Plugins / Mods",
@@ -309,6 +329,8 @@
     "colLabel": "Bezeichnung",
     "colDebit": "Soll",
     "colCredit": "Haben",
+    "colCategory": "Kategorie",
+    "colAccount": "Konto",
     "sameColumnHint": "Bei einer einzigen Spalte mit vorzeichenbehafteten Beträgen wählen Sie dieselbe Spalte für Soll und Haben.",
     "preview": "Vorschau",
     "previewTruncated": "Vorschau der ersten 50 Zeilen von {{count}}.",
@@ -346,6 +368,15 @@
     "needSheetAccount": "Ordnen Sie mindestens ein Blatt einem Konto zu",
     "overlapTitle": "Zeitraum bereits importiert",
     "overlapMessage": "Für einen überschneidenden Zeitraum existiert bereits ein Import: {{files}}. Trotzdem fortfahren?",
+    "latestDataTitle": "Neueste Daten",
+    "latestDataEmpty": "Noch keine Importe.",
+    "startDate": "Beginn",
+    "endDate": "Ende",
+    "noImportForAccount": "Keine Importe",
+    "lastImport": "Letzter",
+    "deleteImportTitle": "Import löschen",
+    "deleteImportMessage": "{{name}} und die zugehörigen Buchungen löschen?",
+    "editDataFamilialeOnly": "Das Löschen von Importen ist nur im Modus Familie verfügbar.",
     "importAnyway": "Trotzdem importieren",
     "supportedFormats": "Unterstützte Formate",
     "supportedFormatsDesc": "Bankexporte als CSV und Excel-Mappen. Die Spaltenzuordnung wird automatisch geführt.",
@@ -376,6 +407,31 @@
         "title": "In Comptal2.1 importieren",
         "body": "Legen Sie die Datei hier ab, ordnen Sie das Konto zu, prüfen Sie die Spaltenzuordnung und bestätigen Sie."
       }
+    },
+    "categories": {
+      "title": "Kategorien konfigurieren",
+      "subtitle": "{{count}} Wert(e) aus der Datei entsprechen keiner Kategorie im Profil.",
+      "hint": "Erstellen Sie jede fehlende Kategorie oder verknüpfen Sie sie mit einer bestehenden. Sie können auch eine Gruppe zuweisen.",
+      "occurrences": "{{count}} Vorkommen",
+      "create": "Erstellen",
+      "link": "Verknüpfen",
+      "linkTo": "Bestehende Kategorie",
+      "chooseExisting": "Kategorie wählen…",
+      "newGroup": "Neue Gruppe…",
+      "newGroupName": "Gruppenname",
+      "newGroupColor": "Gruppenfarbe",
+      "continue": "Weiter zur Vorschau"
+    },
+    "accounts": {
+      "title": "Konten konfigurieren",
+      "subtitle": "{{count}} Wert(e) aus der Datei entsprechen keinem Konto im Profil.",
+      "hint": "Erstellen Sie jedes fehlende Konto oder verknüpfen Sie es mit einem bestehenden.",
+      "occurrences": "{{count}} Vorkommen",
+      "create": "Erstellen",
+      "link": "Verknüpfen",
+      "linkTo": "Bestehendes Konto",
+      "chooseExisting": "Konto wählen…",
+      "continue": "Weiter"
     }
   },
   "columnMapping": {
@@ -406,6 +462,8 @@
     "credit": "Haben",
     "debitCredit": "Soll/Haben kombiniert",
     "balance": "Saldo (optional)",
+    "category": "Kategorie (optional)",
+    "account": "Konto (optional)",
     "errDate": "Datumsspalte fehlt",
     "errLibelle": "Bezeichnungsspalte fehlt",
     "errAmount": "Betragsspalte fehlt"
@@ -429,9 +487,11 @@
     "autocatReview": "Kategorievorschläge",
     "applySuggestions": "Anwenden ({{count}})",
     "confidence": "Konfidenz",
-    "confidenceHigh": "70–100 %",
-    "confidenceMedium": "40–70 %",
-    "confidenceLow": "≤ 40 %",
+    "confidence100_90": "100–90 %",
+    "confidence90_80": "90–80 %",
+    "confidence80_70": "80–70 %",
+    "confidence70_40": "70–40 %",
+    "confidenceLow": "< 40 %",
     "selectAll": "Alles auswählen",
     "selectAllTab": "Registerkarte auswählen",
     "noSuggestions": "Kein Vorschlag (kategorisieren Sie zuerst einige Bezeichnungen).",
@@ -440,10 +500,14 @@
     "noDuplicates": "Kein Duplikat erkannt.",
     "keepFirst": "Das erste Vorkommen wird behalten. Markieren Sie die zu löschenden Kopien.",
     "deleteCopy": "Kopie löschen",
-    "deleteConfirm": "Diese Buchung endgültig löschen?",
+    "deleteConfirm": "Diese Buchung ausblenden? Sie wird archiviert (10 Jahre Aufbewahrung). Für die Vernichtung von Belegen gilt CGI Art. 1734.",
     "valueDate": "Valutadatum",
     "insertAbove": "Oberhalb einfügen",
     "insertBelow": "Unterhalb einfügen",
+    "duplicate": "Duplizieren",
+    "categorize": "Kategorisieren",
+    "bulkDelete": "Löschen ({{count}})",
+    "selectedCount": "{{count}} ausgewählt",
     "rowCountTotal": "{{total}} Buchung(en)",
     "rowCountFiltered": "{{shown}} angezeigt von {{total}} insgesamt",
     "dateFrom": "Von",
@@ -502,14 +566,17 @@
     "balanceEvolution": "Saldoentwicklung",
     "noChartData": "Keine Daten für diesen Zeitraum",
     "expensesByCategory": "Ausgaben nach Kategorie",
+    "expensesByGroup": "Ausgaben nach Gruppierung",
     "incomeByCategory": "Einnahmen vs. Ausgaben",
     "accountBalances": "Saldoentwicklung nach Konto",
     "balance": "Saldo",
     "categoryAverages": "Monatliche Durchschnitte nach Kategorie",
+    "groupAverages": "Monatliche Durchschnitte nach Gruppierung",
     "accountBalancesSection": "Kontosalden",
     "dateToDate": "Von Datum bis Datum",
     "chart": {
       "expensesByCategory": "Ausgaben nach Kategorie",
+      "expensesByGroup": "Ausgaben nach Gruppierung",
       "invoiceVsPayment": "Fakturiert vs. eingegangen",
       "invoiceAging": "Altersstruktur",
       "donationsByDonor": "Spenden nach Spender",
@@ -521,7 +588,9 @@
       "avgMonthlyExpenses": "Monatliche Ausgaben (Ø)",
       "accountBalances": "Kontosalden",
       "topExpenses": "Top-5-Ausgaben",
+      "topExpensesByGroup": "Top-5-Ausgaben nach Gruppierung",
       "monthlyAverages": "Monatliche Durchschnitte nach Kategorie",
+      "monthlyAveragesByGroup": "Monatliche Durchschnitte nach Gruppierung",
       "largestExpense": "Größte Ausgabe",
       "largestIncome": "Größte Einnahme",
       "txCount": "Buchungen",
@@ -627,6 +696,7 @@
         "invoiceVsPayment": "Fakturiert vs. eingegangen",
         "invoiceAging": "Altersstruktur der Rechnungen",
         "donationsByDonor": "Spenden nach Spender",
+        "amortissement": "Abschreibung (Buchwert)",
         "treasuryKpis": "KPI Liquidität",
         "invoicingKpis": "KPI Fakturierung",
         "associationKpis": "KPI Spenden",
@@ -783,17 +853,21 @@
     "credit": "Haben",
     "debit": "Soll",
     "category": "Kategorie",
+    "group": "Gruppierung",
     "totalCredits": "Summe Haben",
     "totalDebits": "Summe Soll",
     "bilanPdfTitle": "Bilanz",
     "bilanNoData": "Keine Bilanzdaten für diesen Zeitraum.",
     "bilanChartCreditsByCategory": "Summe der Haben-Buchungen nach Kategorie",
     "bilanChartDebitsByCategory": "Summe der Soll-Buchungen nach Kategorie",
+    "bilanChartCreditsByGroup": "Summe der Haben-Buchungen nach Gruppierung",
+    "bilanChartDebitsByGroup": "Summe der Soll-Buchungen nach Gruppierung",
     "previous": "Zurück",
     "next": "Weiter",
     "facturationTab": "Fakturierung",
     "donsTab": "Spenden",
     "contactsTab": "Kontakte",
+    "amortissementTab": "Abschreibung",
     "configureCharts": "Diagramme konfigurieren",
     "configureTitle": "Angezeigte Diagramme",
     "configureHint": "Aktivieren Sie die sichtbaren Registerkarten, ordnen Sie sie neu und speichern Sie. Mindestens eine Registerkarte muss aktiv bleiben.",
@@ -812,7 +886,10 @@
     "incompleteContacts": "Unvollständige Datensätze",
     "clientsOnly": "Kunden",
     "donorsOnly": "Spender",
-    "bothRoles": "Beides"
+    "bothRoles": "Beides",
+    "exportExcel": "Excel exportieren",
+    "exportExcelTitle": "Tabelle als Excel (.xlsx) exportieren",
+    "exportedExcel": "Excel-Export gespeichert"
   },
   "finance": {
     "tabMonthly": "Monatsdiagramm",
@@ -859,6 +936,7 @@
     "duplicate": "Duplizieren",
     "deleteRow": "Zeile löschen",
     "newLine": "Neue Zeile",
+    "neutralLine": "Neutral",
     "newGroup": "Neue Gruppe",
     "selectRow": "Wählen Sie eine Zeile in der Tabelle aus.",
     "emptyHint": "Erstellen Sie eine Planung, um mit der Erfassung zu beginnen.",
@@ -873,7 +951,16 @@
       "category": "Nach Kategorie",
       "lines": "Nach Zeile",
       "cashflow": "Cashflow je Zeitraum",
-      "groupBreakdown": "Nach Gruppe"
+      "groupBreakdown": "Nach Gruppe",
+      "desc": {
+        "stats": "Summen Soll, Haben, Nettofluss und Endsaldo im Zeitraum.",
+        "balance": "Kurve des projizierten Saldos je Periode.",
+        "debitCredit": "Gesamtverteilung Soll- vs. Haben-Volumen.",
+        "category": "Kumulierter Nettoeffekt je Kategorie (Details beim Hover).",
+        "lines": "Anteil jeder Zeile am projizierten Volumen.",
+        "cashflow": "Soll, Haben und Nettofluss nach gewählter Granularität.",
+        "groupBreakdown": "Verteilung der Beträge nach Tabellengruppe."
+      }
     },
     "tooltip": {
       "debit": "Soll",
@@ -892,6 +979,10 @@
     "noCategory": "Keine",
     "noGroup": "Keine Gruppe",
     "invalidGroup": "Eine untergeordnete Gruppe kann nicht zugewiesen werden.",
+    "invalidStartDate": "Ungültiges Startdatum — Änderung ignoriert.",
+    "invalidEndDate": "Ungültiges Enddatum — Änderung ignoriert.",
+    "invalidDateRange": "Ungültiger Zeitraum — Daten wurden korrigiert.",
+    "dateStartAfterEnd": "Startdatum darf nicht nach dem Ende liegen — Daten wurden neu geordnet.",
     "columns": {
       "name": "Name",
       "group": "Gruppe",
@@ -915,7 +1006,8 @@
       "weekly": "Wöchentlich",
       "monthly": "Monatlich",
       "quarterly": "Vierteljährlich",
-      "yearly": "Jährlich"
+      "yearly": "Jährlich",
+      "various": "Verschieden"
     },
     "fromCategory": {
       "action": "Aus Kategorie",
@@ -1109,6 +1201,19 @@
     "secteurs": "Tätigkeitsbereiche",
     "secteurNom": "Name des Bereichs",
     "deletePoste": "Diese Position aus dem Katalog löschen?",
+    "pdfSaveWarn": "Das Dokument wurde gespeichert, aber die PDF-Datei konnte nicht erstellt werden.",
+    "vatRate": "MwSt. %",
+    "units": {
+      "unit": "Einheit",
+      "hour": "Stunde",
+      "flatRate": "Pauschale",
+      "squareMeter": "m²",
+      "kilogram": "kg"
+    },
+    "posteTypes": {
+      "materiel": "Material",
+      "travail": "Arbeit"
+    },
     "missingFields": "Der Kunde ist Pflicht",
     "missingDevisNumero": "Die Nummer des Ursprungsangebots fehlt",
     "overCap": "Der Bruttobetrag der Rechnung übersteigt das Angebot",
@@ -1245,7 +1350,11 @@
     "role": "Rolle des Kontakts",
     "allRoles": "Alle Rollen",
     "roleClients": "Kunden",
-    "roleDonors": "Spender"
+    "roleDonors": "Spender",
+    "roleClient": "Kunde",
+    "roleClientHint": "Angebote, Rechnungen und Zahlungen",
+    "roleDonor": "Spender",
+    "roleDonorHint": "Spenden, Buchungen und Zuwendungsbestätigungen"
   },
   "association": {
     "tabGestion": "Spender",
@@ -1592,7 +1701,13 @@
       "previewSupport": "Begleitung",
       "previewSupplies": "Material",
       "previewDues": "Beiträge",
-      "pdfMakeUnavailable": "pdfmake: {{method}} nicht verfügbar"
+      "pdfMakeUnavailable": "pdfmake: {{method}} nicht verfügbar",
+      "previewLaptop": "Laptop",
+      "previewLaptopDetail": "IT-Ausstattung · REF-PC-01 · In Betrieb 2024-03-15",
+      "previewVehicle": "Nutzfahrzeug",
+      "previewVehicleDetail": "Fahrzeug · REF-VU-02 · In Betrieb 2023-06-01",
+      "previewLinear3y": "Linear · 3 Jahre",
+      "previewLinear5y": "Linear · 5 Jahre"
     },
     "totals": {
       "invoiced": "Fakturiert",
@@ -1613,7 +1728,12 @@
       "entreprisesAmount": "Betrag Unternehmen",
       "natureNumeraire": "Geldspende",
       "natureInKind": "Sachspenden",
-      "natureSkills": "Kompetenzspende"
+      "natureSkills": "Kompetenzspende",
+      "immoCount": "Anlagegüter",
+      "immoBrut": "Bruttowert HT",
+      "immoAmorti": "Kumulierte Abschreibungen",
+      "immoDotation": "Periodenaufwand",
+      "immoVnc": "Buchwert"
     },
     "types": {
       "donation_journal": {
@@ -1645,6 +1765,11 @@
         "title": "Übersicht Ausgaben / Gutschriften",
         "shortTitle": "Ausgaben / Gutschriften",
         "description": "Gruppiert Bankbewegungen nach Kategorie über einen Zeitraum."
+      },
+      "amortissement_register": {
+        "title": "Abschreibungsübersicht",
+        "shortTitle": "Abschreibungen",
+        "description": "Hält das Anlagenverzeichnis fest: Brutto, abgeschrieben, Periodenaufwand und Buchwert."
       }
     },
     "settings": {
@@ -1683,7 +1808,11 @@
       "orientation": "Ausrichtung",
       "portrait": "Hochformat",
       "landscape": "Querformat"
-    }
+    },
+    "colImmoBrut": "Brutto HT",
+    "colImmoAmorti": "Abgeschrieben",
+    "colImmoDotation": "Periodenaufwand",
+    "colImmoVnc": "Buchwert"
   },
   "legal": {
     "productTagline": "Treasury, Rechnungen und Spenden — Ergänzung zu Buchhaltungssoftware",
@@ -1700,7 +1829,7 @@
     "privacyController": "Sie sind Verantwortlicher für die Daten auf diesem Computer (DSGVO). Comptal hostet nichts in der Cloud.",
     "privacyRetention": "Belege, Rechnungen, Spendenbescheinigungen: 10 Jahre aufbewahren. Das Löschrecht ist dadurch begrenzt. CGI Art. 1734.",
     "privacyZip": "Ein Profil-Export ist ein unverschlüsseltes ZIP. Schützen Sie es wie einen Buchhaltungsordner.",
-    "privacyUpdates": "Updates kommen von GitHub Releases des Repos LeopaulV/Comptal2 (signierter Installer). Lokale Profile werden nicht gelöscht.",
+    "privacyUpdates": "Updates kommen von GitHub Releases (signierte Installer).",
     "associationDisclaimer": "Comptal erstellt keine Vereinsjahresabschlüsse (ANC 2018-06) und ersetzt keinen Abschlussprüfer.",
     "invoicingDisclaimer": "Rechnungspflichtangaben liegen bei Ihnen. Keine Übermittlung an eine PA. Korrektur einer ausgestellten Rechnung = Gutschrift."
   },
@@ -1748,6 +1877,11 @@
     "issuerMissing": "Aussteller nicht konfiguriert",
     "sirenInvalid": "Ungültige SIREN",
     "noActiveProfile": "Kein aktives Profil",
+    "profileLockedCannotChange": "Gesperrtes Profil: Moduswechsel nicht erlaubt",
+    "profileLockNotAllowed": "Nur KMU- und Vereinsmodus können gesperrt werden",
+    "profileSealMissing": "Gesperrtes Profil: Siegel fehlt (ungültiger Export)",
+    "profileSealInvalid": "Gesperrtes Profil: Siegel ungültig (Manipulation erkannt)",
+    "profileLockedModeInvalid": "Gesperrtes Profil: ungültiger Modus",
     "dbNotOpen": "Datenbank nicht geöffnet (kein aktives Profil)",
     "invalidProfileId": "Ungültige Profilkennung",
     "unsafePath": "Dateipfad abgelehnt",
@@ -1767,5 +1901,126 @@
     "emailInvalid": "Ungültige E-Mail-Adresse",
     "ibanInvalid": "Ungültige IBAN",
     "contactHasLinks": "Dieser Kontakt hat verknüpfte Angebote, Rechnungen oder Spenden: Löschen verweigert"
+  },
+  "amortissement": {
+    "title": "Abschreibung",
+    "disclaimer": "Hilfsmittel zur Vermögensverfolgung. Ersetzt keinen Steuerberater.",
+    "saved": "Abschreibungseinstellungen gespeichert.",
+    "deleted": "Anlagegut gelöscht.",
+    "addAsset": "Anlagegut hinzufügen",
+    "editAsset": "Anlagegut bearbeiten",
+    "empty": "Keine Anlagegüter für diese Filter.",
+    "designation": "Bezeichnung",
+    "reference": "Referenz",
+    "type": "Typ",
+    "amountHT": "Anschaffungswert ohne USt.",
+    "vatRate": "MwSt. %",
+    "acquisitionDate": "Anschaffungsdatum",
+    "serviceDate": "Inbetriebnahme",
+    "duration": "Nutzungsdauer (Jahre)",
+    "method": "Methode",
+    "residualValue": "Restwert",
+    "status": "Status",
+    "cessionDate": "Veräußerungsdatum",
+    "cessionValue": "Veräußerungswert",
+    "supplier": "Lieferant",
+    "invoiceRef": "Rechnungsref.",
+    "grant": "Investitionszuschuss",
+    "lowValue": "Geringer Wert (Aufwand unter Schwelle)",
+    "lowValueShort": "≤500 €",
+    "notes": "Notizen",
+    "notesHint": "Interner Freitext: Kaufkontext, Nutzung, Abschreibungsentscheidung, Zuschuss usw.",
+    "notesPlaceholder": "Z. B. Laptop Geschäftsleitung — linear über 3 Jahre. Rechnung angehängt.",
+    "yearsOwned": "Jahre gehalten",
+    "years": "Jahre",
+    "form": {
+      "identity": "Identität",
+      "values": "Werte & Daten",
+      "depreciation": "Abschreibung"
+    },
+    "depreciationPerYear": "AfA / Jahr",
+    "depreciationCumulative": "Kumuliert",
+    "netValue": "Buchwert",
+    "attachments": "Anhänge",
+    "addAttachment": "Datei anhängen",
+    "attachmentsHint": "PDF, E-Mail (.eml / .msg) oder Bild (Rechnung, Lieferschein, Korrespondenz…).",
+    "noAttachments": "Keine Anhänge.",
+    "attachmentAdded": "Anhang hinzugefügt.",
+    "attachmentRemoved": "Anhang entfernt.",
+    "selectHint": "Wählen Sie ein Anlagegut für Details und Anhänge.",
+    "exampleData": "Beispieldaten",
+    "exampleLoaded": "Beispielsatz geladen: {{count}} Anlagegut/Anlagegüter.",
+    "exampleFail": "Beispieldaten konnten nicht geladen werden.",
+    "deleteTitle": "Anlagegut löschen",
+    "deleteConfirm": "Dieses Anlagegut und seine Anhänge endgültig löschen?",
+    "settingsTitle": "Berechnungseinstellungen",
+    "lowValueThreshold": "Schwelle geringer Wert (€ ohne USt.)",
+    "defaultMethod": "Standardmethode",
+    "monthlyProrata": "Monatsanteilig ab Inbetriebnahme",
+    "durationSchedule": "Nutzungsdauer-Tabelle (BOFiP-Praxis)",
+    "durationScheduleHint": "Übliche Richtwerte, bearbeitbar. Keine einheitliche Amtsdauer.",
+    "resetSchedule": "Tabelle zurücksetzen",
+    "legalTitle": "Rechtsgrundlagen",
+    "legalIntro": "Rahmen für Unternehmen (BIC/PCG) und Vereine (ANC 2018-06).",
+    "legalDisclaimer": "Nur indikativ. Stets aktuelle Amtstexte prüfen.",
+    "chartTitle": "Buchwert im Zeitverlauf",
+    "chartBrut": "Bruttowert",
+    "chartAmorti": "Kumulierte AfA",
+    "chartVnc": "Buchwert",
+    "chartDotation": "Periodenaufwand",
+    "chartEmpty": "Fügen Sie Anlagegüter hinzu, um dieses Diagramm anzuzeigen.",
+    "tabs": {
+      "registre": "Register",
+      "suivi": "Verfolgung",
+      "parametres": "Einstellungen",
+      "references": "Referenzen"
+    },
+    "kpi": {
+      "count": "Anlagegüter",
+      "brut": "Bruttoanschaffungswert",
+      "amorti": "Kumulierte Abschreibung",
+      "vnc": "Buchwert",
+      "dotation": "Jahresaufwand",
+      "attachments": "Anhänge"
+    },
+    "filters": {
+      "all": "Alle Status",
+      "allTypes": "Alle Typen"
+    },
+    "types": {
+      "materiel_informatique": "IT-Ausstattung",
+      "materiel_bureau": "Büroausstattung",
+      "outillage": "Werkzeuge",
+      "vehicule": "Fahrzeug",
+      "mobilier": "Möbel",
+      "logiciel": "Software",
+      "autre": "Sonstiges"
+    },
+    "methods": {
+      "lineaire": "Linear",
+      "degressif": "Degressiv",
+      "non_amortissable": "Nicht abschreibbar"
+    },
+    "statuses": {
+      "actif": "Aktiv",
+      "cede": "Veräußert",
+      "mis_au_rebut": "Verschrottet"
+    },
+    "legal": {
+      "inventory": "Jährliche Inventur der Vermögenswerte — Handelsgesetzbuch",
+      "cgi39": "Abzugsfähige AfA im Rahmen der Branchenpraxis — CGI Art. 39 und",
+      "degressif": "Degressive AfA (Koeff. 1,25 / 1,75 / 2,25) —",
+      "lowValue": "Toleranz ≤ 500 € ohne USt. als Aufwand —",
+      "rates": "Übliche Sätze: IT ~3 Jahre, Fahrzeuge 4–5 Jahre, Möbel ~10 Jahre (BOI-BIC-AMT-10-40-30).",
+      "anc": "Vereine: Jahresabschluss — Verordnung",
+      "assoAccounts": "Konten 28xx (kumuliert) und 6811 (Aufwand) — Lesehilfe.",
+      "grants": "Investitionszuschüsse: Auflösung im Rhythmus der AfA.",
+      "assoSimplified": "Kleine Vereine mit Kassenrechnung können auf AfA verzichten.",
+      "enterpriseNote": "Unternehmen: Nutzungsdauer nach Branchenpraxis (CGI Art. 39)."
+    },
+    "errors": {
+      "designationRequired": "Bezeichnung ist erforderlich.",
+      "notFound": "Anlagegut nicht gefunden."
+    }
   }
 }

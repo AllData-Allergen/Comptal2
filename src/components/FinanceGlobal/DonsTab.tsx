@@ -15,12 +15,17 @@ import {
 } from '../../utils/chartPastel';
 import '../../utils/registerCharts';
 import FinanceInsightKpis from './FinanceInsightKpis';
+import FinanceExcelExportButton from './FinanceExcelExportButton';
+import { ChartGranularity } from '../../types/projection';
+import { periodXTicks } from '../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../Common/ScrollablePeriodChart';
 
 interface DonsTabProps {
   data: AssociationInsights;
+  granularity: ChartGranularity;
 }
 
-const DonsTab: React.FC<DonsTabProps> = ({ data }) => {
+const DonsTab: React.FC<DonsTabProps> = ({ data, granularity }) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -68,7 +73,7 @@ const DonsTab: React.FC<DonsTabProps> = ({ data }) => {
         },
       },
       scales: {
-        x: { ticks: { color: axis, maxRotation: 45 }, grid: { color: grid } },
+        x: { ticks: { ...periodXTicks(granularity, axis) }, grid: { color: grid } },
         y: {
           beginAtZero: true,
           ticks: { color: axis, callback: (value) => formatMoney(Number(value)) },
@@ -76,7 +81,7 @@ const DonsTab: React.FC<DonsTabProps> = ({ data }) => {
         },
       },
     }),
-    [axis, grid, tooltip]
+    [axis, grid, tooltip, granularity]
   );
 
   const issued = Math.max(0, data.count - data.receiptsPending);
@@ -137,8 +142,25 @@ const DonsTab: React.FC<DonsTabProps> = ({ data }) => {
 
   const hasBars = topDonors.some((donor) => donor.total > 0);
 
+  const exportHeaders = useMemo(
+    () => [t('financeGlobal.period'), ...topDonors.map((d) => d.label)],
+    [t, topDonors]
+  );
+  const exportRows = useMemo(
+    () =>
+      data.labels.map((label, i) => [label, ...topDonors.map((d) => d.data[i] ?? 0)]),
+    [data.labels, topDonors]
+  );
+
   return (
     <div className="finance-insight-tab">
+      <FinanceExcelExportButton
+        fileName="finance_dons"
+        sheetName={t('financeGlobal.donsTab')}
+        headers={exportHeaders}
+        rows={exportRows}
+        disabled={!hasBars}
+      />
       <FinanceInsightKpis
         items={[
           { id: 'total', label: t('dashboard.association.total'), value: formatMoney(data.total) },
@@ -157,7 +179,9 @@ const DonsTab: React.FC<DonsTabProps> = ({ data }) => {
           <h3>{t('financeGlobal.donorsEvolution')}</h3>
           {hasBars ? (
             <div className="finance-insight-canvas">
-              <Bar data={barData} options={barOptions} />
+              <ScrollablePeriodChart granularity={granularity} labelCount={data.labels.length}>
+                <Bar data={barData} options={barOptions} />
+              </ScrollablePeriodChart>
             </div>
           ) : (
             <p className="finance-empty-inline">{t('dashboard.noChartData')}</p>

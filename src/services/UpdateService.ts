@@ -1,7 +1,6 @@
-// Mises à jour intégrées : tauri-plugin-updater + GitHub Releases
-// (https://github.com/LeopaulV/Comptal2/releases).
-// latest.json est publié avec chaque release. L'installeur NSIS remplace
-// uniquement le programme ; les profils restent dans %APPDATA%.
+// Mises à jour intégrées : tauri-plugin-updater + GitHub Releases.
+// Le manifest latest.json est publié avec chaque release GitHub
+// (endpoint configuré dans src-tauri/tauri.conf.json).
 import { check, Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { withLog, Logger } from './logger';

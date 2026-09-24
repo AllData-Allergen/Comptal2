@@ -355,7 +355,12 @@ export const InvoiceService = {
         ],
         updatedAt: new Date(),
       };
-      await this.upsertDevis(updated);
+      try {
+        await this.upsertDevis(updated);
+      } catch (err) {
+        await AttachmentService.deleteRel(saved.rel).catch(() => undefined);
+        throw err;
+      }
       return updated;
     }, { data: { devisId: devis.id } });
   },

@@ -55,14 +55,14 @@ Comptal2.1, aujourd’hui, est un **logiciel de trésorerie locale** (comptes ba
 
 ## 3. Ancrage produit : ce que Comptal2.1 est (et n’est pas)
 
-D’après le code et la documentation interne (`schema-sqlite.md`, pages Facturation / Association, plan directeur) :
+D’après le code et la documentation interne (`schema-sqlite.md`, pages Facturation / Dons, plan directeur) :
 
 | Brique | État actuel | Conséquence « officialisation » |
 |---|---|---|
 | Trésorerie | Comptes, imports, transactions débit/crédit, catégories, code `X` (TIC) | Outil de **suivi bancaire**, pas un journal PCG |
 | Partie double / FEC | **Absent** | Ne pas se dire « comptabilité informatisée » au sens L. 47 A LPF tant que le FEC n’existe pas |
 | Facturation | Devis → factures, numéros, TVA, paiements (dont chèque/espèces), pièces jointes, pas de suppression (caduc) | Mentions légales + e-invoicing à caler ; **risque de glisser vers la « caisse »** si on mémorise extra-comptablement des encaissements B2C |
-| Association | Dons, corrélations, Cerfa, signature président, registre des reçus, 2041-RD / 2041-MEC-SD | Déjà le bon *outil* ; l’éligibilité fiscale reste **à l’association utilisatrice** |
+| Dons (domaine associatif) | Dons, corrélations, Cerfa, signature président, registre des reçus, 2041-RD / 2041-MEC-SD | Déjà le bon *outil* ; l’éligibilité fiscale reste **à l’association utilisatrice** |
 | Architecture | Desktop local, SQLite par profil, pas de cloud | Point fort RGPD / souveraineté ; **incompatible** avec le métier de PA (immatriculation, ISO 27001, hébergement UE, interop PPF) |
 | Licence projet | Pas de `LICENSE` à la racine de Comptal2.1 (hors patch Tauri) | À corriger **avant** toute attestation ou contribution externe |
 
@@ -225,7 +225,7 @@ Alternatives associatives / FLOSS à **étudier** (vérifier **toujours** la [li
 
 ## 8. Reçus fiscaux, dons, associations
 
-**Déjà dans Comptal2.1** (plan 9 + page Association) : journal des dons, corrélation catégorie/contact, Cerfa, signature du président, registre, distinction particulier (2041-RD) / entreprise (2041-MEC-SD, Cerfa 16216), dons anonymes sans reçu nominatif.
+**Déjà dans Comptal2.1** (plan 9 : Dons + Organisation + Contacts + Registre) : journal des dons, corrélation catégorie/contact, Cerfa, signature du président, registre, distinction particulier (2041-RD) / entreprise (2041-MEC-SD, Cerfa 16216), dons anonymes sans reçu nominatif.
 
 **Ce qui n’est pas dans le logiciel et ne doit pas être promis :**
 

@@ -70,15 +70,19 @@ function mapRow(r: TxSqlRow): TransactionRow {
 function buildWhere(filters: EditionFilters): { sql: string; params: unknown[] } {
   const clauses: string[] = [sqlTxActive('t')];
   const params: unknown[] = [];
-  if (filters.accountIds && filters.accountIds.length > 0) {
+  if (filters.accountIds && filters.accountIds.length > 0 && !(filters.accountIds.length === 1 && filters.accountIds[0] === ('*' as unknown as number))) {
     clauses.push(`t.account_id IN (${filters.accountIds.map(() => '?').join(',')})`);
     params.push(...filters.accountIds);
+  } else if (filters.accountIds && filters.accountIds.length === 1 && filters.accountIds[0] === ('*' as unknown as number)) {
+    clauses.push('1 = 0');
   }
   if (filters.uncategorizedOnly) {
     clauses.push("(t.category_code IS NULL OR t.category_code = '')");
-  } else if (filters.categoryCodes && filters.categoryCodes.length > 0) {
+  } else if (filters.categoryCodes && filters.categoryCodes.length > 0 && !(filters.categoryCodes.length === 1 && filters.categoryCodes[0] === '*')) {
     clauses.push(`t.category_code IN (${filters.categoryCodes.map(() => '?').join(',')})`);
     params.push(...filters.categoryCodes);
+  } else if (filters.categoryCodes && filters.categoryCodes.length === 1 && filters.categoryCodes[0] === '*') {
+    clauses.push('1 = 0');
   }
   if (filters.dateStart) {
     clauses.push('t.date >= ?');

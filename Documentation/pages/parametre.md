@@ -165,9 +165,7 @@ utilisateur = responsable de traitement, conservation 10 ans, ZIP en clair, upda
 | Télécharger + installer | `UpdateService.downloadInstallAndRelaunch()` |
 | Relancer app | `tauri-plugin-process` relaunch |
 
-Utilise `tauri-plugin-updater` pointant vers les GitHub Releases de
-[LeopaulV/Comptal2](https://github.com/LeopaulV/Comptal2). Une vérification automatique a lieu au
-démarrage. Les profils ne sont pas dans le dossier d’installation : une mise à jour ne les efface pas.
+Utilise `tauri-plugin-updater` pointant vers GitHub Releases.
 
 ---
 

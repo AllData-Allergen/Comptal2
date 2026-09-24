@@ -57,7 +57,7 @@ supprimer un profil dont `info.json` ne porte pas le marqueur `developmentDataba
 | Contacts | Une entreprise, un particulier et un groupement |
 | Facturation | Catalogue, devis accepté, facture payée et transaction liée |
 | Organisation/PDF | Émetteur de test, réglages et mention légale |
-| Association | Configuration, deux donateurs, dons liés/manuels et deux reçus |
+| Dons / Organisation | Configuration associative, contacts donateurs, dons liés/manuels et deux reçus |
 
 Les adresses, identifiants, courriels et coordonnées sont fictifs. Les numéros SIREN/SIRET servent
 uniquement à franchir les validations locales ; ils ne représentent pas l’identité de l’utilisateur.
@@ -72,7 +72,7 @@ flowchart TD
     SAFE -->|Non| DIR[Création du dossier profil]
     CLEAN --> DIR
     DIR --> INFO[Écriture info.json]
-    INFO --> SCHEMA[Création du schéma SQLite v7]
+    INFO --> SCHEMA[Création du schéma SQLite v9]
     SCHEMA --> SEED[Insertion des données cohérentes]
     SEED --> CHECK[foreign_key_check + integrity_check]
     CHECK -->|Erreur| FAIL[Suppression de la base invalide + échec]
@@ -88,7 +88,7 @@ Avant d’annoncer un succès, le script vérifie :
 
 - `PRAGMA integrity_check = 'ok'` ;
 - aucune ligne retournée par `PRAGMA foreign_key_check` ;
-- `PRAGMA user_version = 7` ;
+- `PRAGMA user_version = 9` ;
 - les volumes des tables principales.
 
 Contrôle manuel complémentaire :

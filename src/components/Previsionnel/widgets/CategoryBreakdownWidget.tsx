@@ -10,6 +10,7 @@ import {
   chartPastel,
   chartTooltipTheme,
 } from '../../../utils/chartPastel';
+import PrevisionnelChartFrame from '../PrevisionnelChartFrame';
 import '../../../utils/registerCharts';
 
 interface CategoryBreakdownWidgetProps {
@@ -17,6 +18,7 @@ interface CategoryBreakdownWidgetProps {
   details?: Record<string, BreakdownDetail[]>;
 }
 
+/** Barres horizontales : impact net cumulé par catégorie (détail des lignes en tooltip). */
 const CategoryBreakdownWidget: React.FC<CategoryBreakdownWidgetProps> = ({ slices, details }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -39,7 +41,7 @@ const CategoryBreakdownWidget: React.FC<CategoryBreakdownWidgetProps> = ({ slice
         },
       ],
     }),
-    [sorted, isDark]
+    [sorted]
   );
 
   const options: ChartOptions<'bar'> = useMemo(
@@ -83,9 +85,9 @@ const CategoryBreakdownWidget: React.FC<CategoryBreakdownWidgetProps> = ({ slice
   if (sorted.length === 0) return <p className="previsionnel-empty-chart">—</p>;
 
   return (
-    <div className="previsionnel-chart-h" style={{ minHeight: Math.max(180, sorted.length * 28) }}>
+    <PrevisionnelChartFrame autoHeightPx={Math.max(220, sorted.length * 28)}>
       <Bar data={data} options={options} />
-    </div>
+    </PrevisionnelChartFrame>
   );
 };
 

@@ -5,7 +5,8 @@ export type FinanceTabId =
   | 'bilan'
   | 'facturation'
   | 'dons'
-  | 'contacts';
+  | 'contacts'
+  | 'amortissement';
 
 export interface FinanceTabConfig {
   id: FinanceTabId;
@@ -21,6 +22,7 @@ export const FINANCE_TAB_CATALOG: FinanceTabId[] = [
   'facturation',
   'dons',
   'contacts',
+  'amortissement',
 ];
 
 export const DEFAULT_FINANCE_TABS: FinanceTabConfig[] = FINANCE_TAB_CATALOG.map((id, order) => ({
@@ -37,6 +39,29 @@ export const FINANCE_TAB_I18N: Record<FinanceTabId, string> = {
   facturation: 'financeGlobal.facturationTab',
   dons: 'financeGlobal.donsTab',
   contacts: 'financeGlobal.contactsTab',
+  amortissement: 'financeGlobal.amortissementTab',
 };
 
 export const FINANCE_CHART_TABS_KEY = 'finance_chart_tabs';
+
+import type { UsageMode } from '../utils/usageMode';
+
+export function financePresetForUsage(mode: UsageMode): FinanceTabConfig[] {
+  return FINANCE_TAB_CATALOG.map((id, order) => {
+    let visible = true;
+    if (mode === 'familiale') {
+      if (id === 'facturation' || id === 'dons' || id === 'amortissement') visible = false;
+    } else if (mode === 'tpe') {
+      if (id === 'dons') visible = false;
+    }
+    return { id, visible, order };
+  });
+}
+
+export function isFinanceTabAllowedForMode(tab: FinanceTabId, mode: UsageMode): boolean {
+  if (mode === 'familiale' && (tab === 'facturation' || tab === 'dons' || tab === 'amortissement')) {
+    return false;
+  }
+  if (mode === 'tpe' && tab === 'dons') return false;
+  return true;
+}

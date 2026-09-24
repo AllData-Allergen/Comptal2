@@ -77,57 +77,63 @@ export const PREDEFINED_PALETTES: ColorPalette[] = [
     id: 'monochrome-pastel-bleu',
     name: 'Monochrome pastel bleu',
     colors: [
-      '#6BA6D4', '#82B6DC', '#98C6E4', '#AED6EC', '#C4E2F2', '#D6EAF8',
-      '#E2F0FA', '#B8D4EA', '#9CC4E0', '#7EB0D6', '#A8CDE6', '#CDE4F3',
+      '#7EB8D8', '#8EC8E0', '#A8D4E8', '#C0E0F0',
+      '#94A0D0', '#A8B4D8', '#BCC8E4', '#D0D8EC',
+      '#70C0C8', '#88CCC8', '#A0D8D0', '#B8E4DC',
     ],
   },
   {
     id: 'monochrome-pastel-vert',
     name: 'Monochrome pastel vert',
     colors: [
-      '#6DBF8C', '#84C99C', '#9BD4AD', '#B2DFBD', '#C8E9CE', '#D9F0DE',
-      '#E8F6EB', '#A3D4B4', '#8CC8A2', '#75BC90', '#B8E0C6', '#D4EEDC',
+      '#7CC8A0', '#90D4B0', '#A4DEC0', '#B8E8D0',
+      '#A0C090', '#B0CCA4', '#C4D8B8', '#D4E4CC',
+      '#80D4B0', '#98D8BC', '#A8E0C8', '#C0E8D4',
     ],
   },
   {
     id: 'monochrome-pastel-rose',
     name: 'Monochrome pastel rose',
     colors: [
-      '#E88A9A', '#EDA0AC', '#F2B6BE', '#F6CBD0', '#F9DCE0', '#FBE8EA',
-      '#FDF2F3', '#F0B0BA', '#E89AA8', '#DE8494', '#F4C4CC', '#F8D8DE',
+      '#E894A8', '#F0A8B8', '#F4BCC8', '#F8D0D8',
+      '#E8A098', '#F0B4AC', '#F4C4BC', '#F8D4CC',
+      '#D898B0', '#E4ACB8', '#ECC0C8', '#F4D4D8',
     ],
   },
   {
     id: 'monochrome-pastel-violet',
     name: 'Monochrome pastel violet',
     colors: [
-      '#B08CC8', '#C0A0D4', '#D0B4E0', '#DEC8EA', '#E8D8F0', '#F0E6F6',
-      '#F6F0FA', '#C8B0DC', '#B89CD0', '#A688C4', '#D4C0E4', '#E6D8F0',
+      '#A8A0D0', '#BCB4D8', '#D0C8E4', '#E0D8EC',
+      '#B4A0D8', '#C4B4E0', '#D4C8E8', '#E4D8F0',
+      '#C0A0CC', '#D0B4D4', '#DCC4E0', '#E8D8EC',
     ],
   },
   {
     id: 'monochrome-pastel-peche',
     name: 'Monochrome pastel pêche',
     colors: [
-      '#E8A878', '#EEC090', '#F2CFA4', '#F6DAB8', '#F8E4C8', '#FAEDD8',
-      '#FCF5E8', '#F0C89C', '#E8B888', '#DCB090', '#F4D8B8', '#F8E8D0',
+      '#F0B898', '#F4C8A8', '#F8D8BC', '#FAE4CC',
+      '#F0A8A0', '#F4B8B0', '#F8C8C0', '#FCD8D0',
+      '#E8B8A0', '#F0C8B0', '#F4D4C0', '#F8E0D0',
     ],
   },
   {
     id: 'monochrome-pastel-gris',
     name: 'Monochrome pastel gris',
     colors: [
-      '#8E97A1', '#A2AAB2', '#B6BDC4', '#C8CED3', '#D8DDE1', '#E4E8EB',
-      '#EEF0F2', '#B0B8C0', '#9AA3AC', '#869099', '#C4CAD0', '#DCE0E4',
+      '#A0A8B4', '#B4BCC4', '#C4CCD4', '#D4DCE0',
+      '#9CA4B8', '#B0B8C8', '#C0C8D4', '#D0D8E0',
+      '#A8A4A4', '#BCB8B8', '#CCC8C8', '#DCD8D8',
     ],
   },
   {
     id: 'dynamique-pastel',
     name: 'Dynamique (débit / crédit)',
     kind: 'dynamic',
-    description: 'Rose pastel pour les débits, vert pastel pour les crédits — répartition logarithmique : plus le montant est élevé, plus la teinte est marquée.',
+    description: 'Jaune → orange → rouge pastel pour les débits, vert pastel pour les crédits — répartition logarithmique : plus le montant est élevé, plus la teinte est marquée.',
     colors: [
-      '#E06B7C', '#EA94A0', '#F4C4CA', '#E8E4DC', '#C5EBD4', '#86D4A8', '#4FBF86',
+      '#F5E0A0', '#EBB899', '#EB9999', '#E8E4DC', '#C0E0CB', '#99CCA8', '#80B399',
     ],
   },
 ];
@@ -246,6 +252,21 @@ export function isDynamicPalette(palette: ColorPalette): boolean {
 const DYNAMIC_NEUTRAL = '#E8E4DC';
 const DYNAMIC_EPS = 0.005;
 
+function rankSpread(absValues: number[]): number[] {
+  const n = absValues.length;
+  if (n === 0) return [];
+  if (n === 1) return [0.5];
+
+  const ranked = absValues
+    .map((value, index) => ({ index, value }))
+    .sort((a, b) => a.value - b.value);
+  const result = Array(n).fill(0);
+  ranked.forEach((item, rank) => {
+    result[item.index] = rank / (n - 1);
+  });
+  return result;
+}
+
 function logSpread(absValues: number[]): number[] {
   const n = absValues.length;
   if (n === 0) return [];
@@ -278,12 +299,38 @@ function logSpread(absValues: number[]): number[] {
 function pastelByIntensity(isDebit: boolean, intensity: number): string {
   const t = Math.min(1, Math.max(0, intensity));
   if (isDebit) {
-    return hslToHex(0.985 - t * 0.03, 0.32 + t * 0.5, 0.86 - t * 0.4);
+    const stops = [
+      { t: 0, h: 0.13, s: 0.45, l: 0.84 },
+      { t: 0.5, h: 0.07, s: 0.50, l: 0.80 },
+      { t: 1, h: 0.0, s: 0.50, l: 0.78 },
+    ];
+    const i = t <= 0.5 ? 0 : 1;
+    const localT = t <= 0.5 ? t / 0.5 : (t - 0.5) / 0.5;
+    const from = stops[i];
+    const to = stops[i + 1];
+    return hslToHex(
+      from.h + (to.h - from.h) * localT,
+      from.s + (to.s - from.s) * localT,
+      from.l + (to.l - from.l) * localT,
+    );
   }
-  return hslToHex(0.44 - t * 0.08, 0.34 + t * 0.48, 0.86 - t * 0.38);
+  const stops = [
+    { t: 0, h: 0.38, s: 0.35, l: 0.85 },
+    { t: 0.5, h: 0.35, s: 0.40, l: 0.80 },
+    { t: 1, h: 0.30, s: 0.45, l: 0.75 },
+  ];
+  const i = t <= 0.5 ? 0 : 1;
+  const localT = t <= 0.5 ? t / 0.5 : (t - 0.5) / 0.5;
+  const from = stops[i];
+  const to = stops[i + 1];
+  return hslToHex(
+    from.h + (to.h - from.h) * localT,
+    from.s + (to.s - from.s) * localT,
+    from.l + (to.l - from.l) * localT,
+  );
 }
 
-/** Rose pastel (débit) ou vert pastel (crédit), intensité logarithmique. */
+/** Jaune→orange→ rouge pastel pour débits (classement par rang), vert pastel pour crédits. */
 export function dynamicPastelColor(net: number, maxAbs: number): string {
   if (!Number.isFinite(net) || Math.abs(net) < DYNAMIC_EPS) return DYNAMIC_NEUTRAL;
   const intensity = maxAbs > 0
@@ -307,7 +354,7 @@ export function assignDynamicPastelColors(nets: Record<string, number>): Record<
     else credits.push({ code, abs: net });
   }
 
-  const debitSpread = logSpread(debits.map((item) => item.abs));
+  const debitSpread = rankSpread(debits.map((item) => item.abs));
   debits.forEach((item, index) => {
     colors[item.code] = pastelByIntensity(true, debitSpread[index]);
   });

@@ -93,6 +93,21 @@ export function guessRoleFromHeader(name: string): ColumnRole | null {
     return 'libelle';
   }
 
+  if (
+    /^(categorie|category|cat)$/.test(n) ||
+    /\b(categorie|categories|category|categories)\b/.test(n)
+  ) {
+    return 'category';
+  }
+
+  if (
+    /^(compte|comptes|account|accounts|cpt|acc)$/.test(n) ||
+    /\b(compte bancaire|bank account)\b/.test(n) ||
+    (/\b(compte|account)\b/.test(n) && !/\b(comptable|accounting|solde)\b/.test(n))
+  ) {
+    return 'account';
+  }
+
   return null;
 }
 

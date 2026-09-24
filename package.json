@@ -1,7 +1,7 @@
 {
   "name": "comptal21",
   "private": true,
-  "version": "2.1.0",
+  "version": "2.1.2",
   "description": "Comptal2.1 - Logiciel de comptabilité (Tauri 2 + React + SQLite)",
   "type": "module",
   "author": "Leopaul",
@@ -17,7 +17,6 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "tauri:build:windows": "tauri build --bundles nsis",
-    "tauri:build:windows:signed": "powershell -ExecutionPolicy Bypass -File scripts/build-windows.ps1",
     "tauri:build:linux": "tauri build --bundles deb,rpm",
     "tauri:ios:init": "tauri ios init",
     "tauri:ios:build": "tauri ios build"
@@ -40,7 +39,7 @@
     "react-i18next": "^17.0.12",
     "react-router-dom": "^6.30.6",
     "react-toastify": "^11.1.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "npm:@e965/xlsx@0.20.3"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.4",

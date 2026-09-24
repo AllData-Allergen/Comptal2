@@ -1,10 +1,18 @@
-/** Parse un montant FR/EN (espaces, virgule, euro). */
+/** Parse un montant FR/EN (espaces, virgule, euro). Chaîne vide → 0. */
 export function parseAmount(raw: unknown): number {
-  if (raw === null || raw === undefined || raw === '') return 0;
-  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : 0;
-  const cleaned = String(raw).replace(/[\s\u00a0€]/g, '').replace(',', '.');
+  return parseAmountOptional(raw) ?? 0;
+}
+
+/** Parse un montant FR/EN. Chaîne vide / invalide → null (0 reste 0). */
+export function parseAmountOptional(raw: unknown): number | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  const trimmed = String(raw).trim();
+  if (!trimmed) return null;
+  const cleaned = trimmed.replace(/[\s\u00a0€]/g, '').replace(',', '.');
+  if (!cleaned) return null;
   const value = parseFloat(cleaned);
-  return Number.isFinite(value) ? value : 0;
+  return Number.isFinite(value) ? value : null;
 }
 
 export function roundMoney(value: number): number {

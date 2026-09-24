@@ -11,13 +11,29 @@ export interface SuggestionItem {
   confidence: number;
 }
 
-type TabKey = 'high' | 'medium' | 'low';
+type TabKey = 'r100_90' | 'r90_80' | 'r80_70' | 'r70_40' | 'low';
 
-const TABS: { key: TabKey; labelKey: string; min: number; max: number }[] = [
-  { key: 'high', labelKey: 'edition.confidenceHigh', min: 0.7, max: 1 },
-  { key: 'medium', labelKey: 'edition.confidenceMedium', min: 0.4, max: 0.7 },
+interface ConfidenceTab {
+  key: TabKey;
+  labelKey: string;
+  min: number;
+  max: number;
+  maxInclusive?: boolean;
+}
+
+const TABS: ConfidenceTab[] = [
+  { key: 'r100_90', labelKey: 'edition.confidence100_90', min: 0.9, max: 1, maxInclusive: true },
+  { key: 'r90_80', labelKey: 'edition.confidence90_80', min: 0.8, max: 0.9 },
+  { key: 'r80_70', labelKey: 'edition.confidence80_70', min: 0.7, max: 0.8 },
+  { key: 'r70_40', labelKey: 'edition.confidence70_40', min: 0.4, max: 0.7 },
   { key: 'low', labelKey: 'edition.confidenceLow', min: 0, max: 0.4 },
 ];
+
+function matchesConfidenceTab(confidence: number, tab: ConfidenceTab): boolean {
+  const aboveMin = confidence >= tab.min;
+  const belowMax = tab.maxInclusive ? confidence <= tab.max : confidence < tab.max;
+  return aboveMin && belowMax;
+}
 
 interface AutoCatReviewModalProps {
   isOpen: boolean;
@@ -33,19 +49,13 @@ const AutoCatReviewModal: React.FC<AutoCatReviewModalProps> = ({
   onApply,
 }) => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<TabKey>('high');
+  const [activeTab, setActiveTab] = useState<TabKey>('r100_90');
   const [unchecked, setUnchecked] = useState<Set<number>>(new Set());
 
   const tabItems = useMemo(() => {
     const tab = TABS.find((x) => x.key === activeTab);
     if (!tab) return [];
-    if (tab.key === 'high') {
-      return items.filter((s) => s.confidence >= 0.7);
-    }
-    if (tab.key === 'medium') {
-      return items.filter((s) => s.confidence >= 0.4 && s.confidence < 0.7);
-    }
-    return items.filter((s) => s.confidence < 0.4);
+    return items.filter((s) => matchesConfidenceTab(s.confidence, tab));
   }, [items, activeTab]);
 
   const selected = items.filter((item) => !unchecked.has(item.id));

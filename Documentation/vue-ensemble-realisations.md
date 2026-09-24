@@ -94,9 +94,9 @@ Comptal2.1/
 
 ---
 
-## 4. Schéma SQLite (version 14)
+## 4. Schéma SQLite (version 15)
 
-Tables créées par `ensureSchema()` dans `src/services/db.ts` (`SCHEMA_VERSION = 14`) :
+Tables créées par `ensureSchema()` dans `src/services/db.ts` (`SCHEMA_VERSION = 15`) :
 
 ### v1 — Cœur comptable
 - `accounts` — comptes bancaires (code, nom, couleur, solde initial)
@@ -116,7 +116,7 @@ Tables créées par `ensureSchema()` dans `src/services/db.ts` (`SCHEMA_VERSION 
 - Colonnes `parent_id`, `is_group`, `end_date`, `color`, `sort_order`
 - Index des lignes par projet et parent
 
-### v5 à v7 — Organisation, contacts, facturation et association
+### v5 à v7 — Organisation, contacts, facturation et dons
 - `invoice_emetteur`, `invoice_settings`, `pdf_templates`, `legal_mentions`
 - `clients`, `contact_groups`, `devis`, `factures`
 - `postes_catalogue`, `postes_groupes`, `secteurs_activite`
@@ -126,6 +126,10 @@ Tables créées par `ensureSchema()` dans `src/services/db.ts` (`SCHEMA_VERSION 
 - `register_settings`, `register_documents`, `register_items`, `register_links`, `register_attachments`
 - `donations`, `donation_rules`
 - `color_palettes`, `label_rules`, `dashboard_settings`, `app_settings`, `category_groups`
+
+### v15 — Plugins et archivage des transactions
+- `plugin_state` — activation des plugins déclaratifs par profil
+- `transactions.deleted_at` — archivage réversible utilisé par l’historique d’édition
 
 **Conventions métier** :
 - Dates en ISO `yyyy-MM-dd`
@@ -192,9 +196,10 @@ Tables créées par `ensureSchema()` dans `src/services/db.ts` (`SCHEMA_VERSION 
 - Onglets Devis/Factures et Postes
 - Devis conservés/caducs, factures rattachées, paiements et rapprochement bancaire
 
-### Dons (`/dons`, alias `/association`)
+### Dons (`/dons` ; alias historique `/association` → redirection)
 - Journal unifié (`DonationService`), rapprochement de transactions et corrélations
-- Reçus fiscaux avec signature, registre `registre_recus`
+- Reçus fiscaux avec signature ; identité associative dans Paramètres → Organisation
+- États figés dans Registre ; donateurs = contacts à rôle `donateur`
 
 ### Registre (`/registre`)
 - Génération de documents de période (facturation, trésorerie, dons, références)
@@ -214,6 +219,7 @@ Alias de compatibilité :
 - `/project-management` → `/previsionnel`
 - `/invoicing` → `/facturation`
 - `/contacts` → `/clients`
+- `/association` → `/dons`
 
 ---
 

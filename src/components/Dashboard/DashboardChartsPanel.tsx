@@ -4,6 +4,8 @@ import { Category } from '../../types/models';
 import { CategoryTotal, KpiStats } from '../../services/StatsService';
 import { ChartGranularity } from '../../types/projection';
 import { DashboardChartWidgets, DashboardInsights, DonationsByDonorMode } from '../../types/dashboard';
+import { CategoryAggregation } from '../../utils/categoryAggregate';
+import CategoryAggToggle from '../Common/CategoryAggToggle';
 import CategoryExpensesBarChart from './CategoryExpensesBarChart';
 import IncomePieChart from './IncomePieChart';
 import AccountBalanceLineChart from './AccountBalanceLineChart';
@@ -11,6 +13,8 @@ import ChartGranularityZoom from '../Common/ChartGranularityZoom';
 import InvoiceVsPaymentChart from './InvoiceVsPaymentChart';
 import InvoiceAgingChart from './InvoiceAgingChart';
 import DonationsByDonorChart from './DonationsByDonorChart';
+import AmortissementDashboardChart from './AmortissementDashboardChart';
+import { AmortissementSeries } from '../../types/amortissement';
 
 interface DashboardChartsPanelProps {
   catTotals: CategoryTotal[];
@@ -25,6 +29,9 @@ interface DashboardChartsPanelProps {
   donationsByDonorMode: DonationsByDonorMode;
   unlinkedInvoices: number;
   unlinkedDonations: number;
+  categoryAggregation: CategoryAggregation;
+  onCategoryAggregationChange: (value: CategoryAggregation) => void;
+  amortissementSeries: AmortissementSeries | null;
 }
 
 const DashboardChartsPanel: React.FC<DashboardChartsPanelProps> = ({
@@ -40,9 +47,13 @@ const DashboardChartsPanel: React.FC<DashboardChartsPanelProps> = ({
   donationsByDonorMode,
   unlinkedInvoices,
   unlinkedDonations,
+  categoryAggregation,
+  onCategoryAggregationChange,
+  amortissementSeries,
 }) => {
   const { t } = useTranslation();
   const showTreasuryRow = charts.expensesByCategory || charts.incomePie;
+  const byGroup = categoryAggregation === 'group';
 
   return (
     <div className="dashboard-charts-section">
@@ -50,7 +61,19 @@ const DashboardChartsPanel: React.FC<DashboardChartsPanelProps> = ({
         <div className="dashboard-charts-row-top">
           {charts.expensesByCategory && (
             <div className="chart-container chart-container-bar">
-              <h2>{t('dashboard.chart.expensesByCategory')}</h2>
+              <div className="chart-container-header">
+                <h2>
+                  {t(
+                    byGroup
+                      ? 'dashboard.chart.expensesByGroup'
+                      : 'dashboard.chart.expensesByCategory'
+                  )}
+                </h2>
+                <CategoryAggToggle
+                  value={categoryAggregation}
+                  onChange={onCategoryAggregationChange}
+                />
+              </div>
               <CategoryExpensesBarChart
                 totals={catTotals}
                 categories={categories}
@@ -90,7 +113,7 @@ const DashboardChartsPanel: React.FC<DashboardChartsPanelProps> = ({
                   {t('dashboard.filterNotice.invoices', { count: unlinkedInvoices })}
                 </p>
               )}
-              <InvoiceVsPaymentChart series={insights.invoicing.series} />
+              <InvoiceVsPaymentChart series={insights.invoicing.series} granularity={granularity} />
             </div>
           )}
           {charts.invoiceAging && (
@@ -117,7 +140,21 @@ const DashboardChartsPanel: React.FC<DashboardChartsPanelProps> = ({
               {t('dashboard.filterNotice.donations', { count: unlinkedDonations })}
             </p>
           )}
-          <DonationsByDonorChart labels={insights.association.labels} donors={insights.association.donors} />
+          <DonationsByDonorChart
+            labels={insights.association.labels}
+            donors={insights.association.donors}
+            granularity={granularity}
+          />
+        </div>
+      )}
+
+      {charts.amortissement && (
+        <div className="chart-container chart-container-line full-width">
+          <div className="chart-container-header">
+            <h2>{t('amortissement.chartTitle')}</h2>
+            <ChartGranularityZoom granularity={granularity} onChange={onGranularityChange} />
+          </div>
+          <AmortissementDashboardChart series={amortissementSeries} granularity={granularity} />
         </div>
       )}
     </div>

@@ -43,14 +43,25 @@ Les contacts, documents, donateurs, reçus et éléments de catalogue utilisent 
 Relations maintenues par le code, non par SQLite :
 
 ```mermaid
-flowchart LR
-    CONTACT[Client.id] --> DEVIS[Devis.clientId]
-    CONTACT --> FACTURE[Facture.clientId]
-    DEVIS --> FACTURE_LINK[Facture.devisOrigine]
-    TX[Transaction.id] --> PAYMENT[Paiement.transactionId string]
-    DONOR[Donateur.id] --> DON[Don.donateurId]
-    DONOR --> MAP[donateur_transactions.donateur_id]
-    TX --> MAPTX[donateur_transactions.transaction_id string]
+flowchart TB
+    subgraph billing [Contacts et facturation]
+        direction LR
+        CONTACT1[Client.id] --> DEVIS[Devis.clientId]
+        CONTACT2[Client.id] --> FACTURE[Facture.clientId]
+        DEVIS_ID[Devis.id] --> FACTURE_LINK[Facture.devisOrigine]
+    end
+
+    subgraph payment [Paiements bancaires]
+        direction LR
+        TX1[Transaction.id] --> PAYMENT[Paiement.transactionId]
+    end
+
+    subgraph donation [Dons historiques]
+        direction LR
+        DONOR1[Donateur.id] --> DON[Don.donateurId]
+        DONOR2[Donateur.id] --> MAP[donateur_transactions.donateur_id]
+        TX2[Transaction.id] --> MAPTX[donateur_transactions.transaction_id]
+    end
 ```
 
 Une suppression ou migration doit vérifier ces liens explicitement.

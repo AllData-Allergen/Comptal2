@@ -28,7 +28,7 @@ utilisés pour déduire l’état livré lorsqu’ils contredisent le code.
 - Finance place ses outils dans une sidebar droite.
 - Prévisionnel utilise `ForecastGrid`, pas Univer.
 - Paramètres comporte sept onglets avec Organisation.
-- Contacts, Facturation et Association ont été livrés après les plans 1–6.
+- Contacts, Facturation et Dons (ex-page Association redistribuée) ont été livrés après les plans 1–6.
 
 Les liens internes cassés contenus dans certaines captures `*.plan.md` sont conservés comme trace
 historique et ne font pas partie de la documentation active.

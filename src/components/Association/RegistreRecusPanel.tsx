@@ -7,6 +7,7 @@ import { AttachmentService } from '../../services/AttachmentService';
 import { Logger } from '../../services/logger';
 import { RegistreRecusService } from '../../services/RegistreRecusService';
 import { formatMoney } from '../../utils/invoiceFormat';
+import { registerDateLocale } from '../../utils/registerI18n';
 import ConfirmModal from '../Common/ConfirmModal';
 
 const formatDate = (iso: string | undefined, locale: string) => {
@@ -25,7 +26,7 @@ interface RegistreRecusPanelProps {
 
 const RegistreRecusPanel: React.FC<RegistreRecusPanelProps> = ({ isVisible = true, start, end }) => {
   const { t, i18n } = useTranslation();
-  const dateLocale = i18n.language.startsWith('en') ? 'en-GB' : 'fr-FR';
+  const dateLocale = registerDateLocale(i18n.language);
   const natureLabel = (nature?: string) => {
     if (!nature) return '—';
     if (nature === 'numeraire') return t('association.numeraire');

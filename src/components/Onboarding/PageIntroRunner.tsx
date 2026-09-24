@@ -10,6 +10,7 @@ const PageIntroRunner: React.FC = () => {
   const lastAutoRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!SettingsService.current.scopeAcknowledged) return;
     if (tourActive || pageIntro) return;
     const intro = pageIntroForPath(location.pathname);
     if (!intro) {

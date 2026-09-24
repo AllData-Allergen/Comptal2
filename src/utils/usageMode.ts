@@ -16,7 +16,7 @@ export function parseUsageMode(value: unknown, fallback: UsageMode = 'tpe'): Usa
 export function menuPresetForUsage(mode: UsageMode): MenuVisibility {
   const all = { ...DEFAULT_MENU_VISIBILITY };
   if (mode === 'familiale') {
-    return { ...all, invoicing: false, association: false, register: false };
+    return { ...all, invoicing: false, association: false, register: false, amortissement: false };
   }
   if (mode === 'tpe') {
     return { ...all, association: false };

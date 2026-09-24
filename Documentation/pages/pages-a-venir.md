@@ -33,17 +33,24 @@ Le module gère les contacts, postes, devis, factures, paiements, pièces jointe
 
 ---
 
-## 3. Association devenue Dons
+## 3. Ancienne page Association — redistribuée
 
-| Attribut | Valeur |
+Il n’y a plus de page menu « Association ». Les responsabilités sont réparties :
+
+| Ancienne responsabilité | Lieu actuel |
+|-------------------------|-------------|
+| Identité, éligibilité, signataire, PDF reçus | Paramètres → Organisation |
+| Fiches donateurs | Contacts (`#/clients`, rôle `donateur`) |
+| Journal, rapprochement, corrélations, émission | **Dons** (`#/dons`) |
+| États annuels figés | Registre (`#/registre`) |
+
+| Attribut page Dons | Valeur |
 |----------|--------|
 | Route canonique | `#/dons` |
-| Alias | `#/association` redirige vers la route canonique |
-| Clé i18n | `pages.association` |
+| Alias | `#/association` redirige vers `#/dons` |
+| Clé i18n | `pages.association` / `navigation.association` (libellé « Gestion des dons ») |
 | Statut | Réalisé |
-| Fichier page | `src/pages/Association/Association.tsx` |
-
-Le module gère le journal des dons, le rapprochement bancaire, les corrélations et les reçus fiscaux.
+| Fichier page | `src/pages/Association/Association.tsx` (nom de dossier hérité) |
 
 ---
 
@@ -85,6 +92,7 @@ Géré par `Sidebar.tsx` qui filtre `ALL_MENU_ITEMS` selon `SettingsService.curr
 
 - [Prévisionnel](./previsionnel.md)
 - [Facturation](./facturation.md)
-- [Association / Dons](./association.md)
+- [Dons](./dons.md)
 - [Registre](./registre.md)
+- [Amortissement](./amortissement.md)
 - [Plan directeur actuel](../plans/plan-directeur-actuel.md)

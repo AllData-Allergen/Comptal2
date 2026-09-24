@@ -52,22 +52,26 @@ catégorie/transaction. Le menu d’en-tête contrôle les colonnes et leurs typ
 
 ## Processus
 
+### Chargement et calcul
+
 ```mermaid
-flowchart TD
+flowchart LR
     LOAD[Choisir une prévision] --> PROJECT[ProjectService.get]
     PROJECT --> TREE[listSubscriptionTree]
     TREE --> GRID[treeToGridRows → ForecastGrid]
-    GRID --> ACTION{Action}
-    ACTION -->|Cellule| UPDATE[updateSubscription]
-    ACTION -->|Nouvelle ligne/groupe| INSERT[addSubscription]
-    ACTION -->|Suppression| DELETE[removeSubscription]
-    ACTION -->|Réordonner| ORDER[reorderSubscriptions]
-    UPDATE --> REFRESH[Recharger l’arbre]
-    INSERT --> REFRESH
-    DELETE --> REFRESH
-    ORDER --> REFRESH
-    REFRESH --> COMPUTE[computeForecast]
+    GRID --> COMPUTE[computeForecast]
     COMPUTE --> WIDGETS[Widgets]
+```
+
+### Modification de la grille
+
+```mermaid
+flowchart LR
+    ACTION[Modifier · ajouter · supprimer · réordonner]
+    ACTION --> SERVICE[ProjectService<br/>update · add · remove · reorder]
+    SERVICE --> DB[(project_subscriptions)]
+    DB --> RELOAD[Recharger l'arbre]
+    RELOAD --> GRID[Grille et widgets actualisés]
 ```
 
 ## Fonctions internes

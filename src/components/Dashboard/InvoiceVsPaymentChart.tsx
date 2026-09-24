@@ -5,14 +5,18 @@ import { ChartData, ChartOptions } from 'chart.js';
 import { formatMoney } from '../../utils/amounts';
 import { useTheme } from '../../hooks/useTheme';
 import { InvoicePeriodSeries } from '../../types/dashboard';
+import { ChartGranularity } from '../../types/projection';
 import { dashboardChartTheme, dashboardTooltipOptions } from '../../utils/dashboardChartTheme';
+import { periodXTicks } from '../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../Common/ScrollablePeriodChart';
 import '../../utils/registerCharts';
 
 interface InvoiceVsPaymentChartProps {
   series: InvoicePeriodSeries;
+  granularity: ChartGranularity;
 }
 
-const InvoiceVsPaymentChart: React.FC<InvoiceVsPaymentChartProps> = ({ series }) => {
+const InvoiceVsPaymentChart: React.FC<InvoiceVsPaymentChartProps> = ({ series, granularity }) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
@@ -87,7 +91,7 @@ const InvoiceVsPaymentChart: React.FC<InvoiceVsPaymentChartProps> = ({ series })
         },
       },
       scales: {
-        x: { ticks: { color: colors.text, maxRotation: 45 }, grid: { color: colors.grid } },
+        x: { ticks: { ...periodXTicks(granularity, colors.text) }, grid: { color: colors.grid } },
         y: {
           beginAtZero: true,
           ticks: { color: colors.text, callback: (value) => formatMoney(Number(value)) },
@@ -102,7 +106,7 @@ const InvoiceVsPaymentChart: React.FC<InvoiceVsPaymentChartProps> = ({ series })
         },
       },
     }),
-    [colors]
+    [colors, granularity]
   );
 
   if (!hasData) {
@@ -111,7 +115,9 @@ const InvoiceVsPaymentChart: React.FC<InvoiceVsPaymentChartProps> = ({ series })
 
   return (
     <div className="chart-canvas-wrap">
-      <Bar data={chartData} options={options} />
+      <ScrollablePeriodChart granularity={granularity} labelCount={series.labels.length}>
+        <Bar data={chartData} options={options} />
+      </ScrollablePeriodChart>
     </div>
   );
 };

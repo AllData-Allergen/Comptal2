@@ -29,6 +29,7 @@ const MENU_LABELS: Array<{ key: keyof MenuVisibility; labelKey: string }> = [
   { key: 'clients', labelKey: 'navigation.clients' },
   { key: 'association', labelKey: 'navigation.association' },
   { key: 'register', labelKey: 'navigation.register' },
+  { key: 'amortissement', labelKey: 'navigation.amortissement' },
 ];
 
 const GeneralTab: React.FC = () => {
@@ -51,6 +52,19 @@ const GeneralTab: React.FC = () => {
   const menuLabels = MENU_LABELS.filter(
     ({ key }) => usageMode !== 'familiale' || key !== 'register'
   );
+  const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    void ProfileService.list().then((pls) => {
+      const active = pls.find((p) => p.id === SettingsService.current.activeProfileId);
+      setLocked(Boolean(active?.usageLocked && (active.usageMode === 'tpe' || active.usageMode === 'association')));
+    }).catch(() => undefined);
+  }, [settings.activeProfileId]);
+  const isLockedKey = (key: keyof MenuVisibility) => {
+    if (!locked) return false;
+    if (usageMode === 'tpe') return key === 'invoicing';
+    if (usageMode === 'association') return key === 'invoicing' || key === 'association' || key === 'register';
+    return false;
+  };
 
   const update = async (partial: Partial<AppSettings>) => {
     try {
@@ -240,6 +254,7 @@ const GeneralTab: React.FC = () => {
                 type="checkbox"
                 className="w-4 h-4 accent-blue-600"
                 checked={settings.menuVisibility[key]}
+                disabled={isLockedKey(key)}
                 onChange={(e) =>
                   void update({
                     menuVisibility: { ...settings.menuVisibility, [key]: e.target.checked },

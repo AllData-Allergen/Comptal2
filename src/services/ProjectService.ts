@@ -314,8 +314,27 @@ export const ProjectService = {
 
   async removeSubscription(id: number): Promise<void> {
     return withLog('ProjectService.removeSubscription', async () => {
-      await Db.execute('DELETE FROM project_subscriptions WHERE parent_id = ?', [id]);
-      await Db.execute('DELETE FROM project_subscriptions WHERE id = ?', [id]);
+      await Db.inTransaction('ProjectService.removeSubscription', async () => {
+        const ids: number[] = [];
+        const queue = [id];
+        while (queue.length > 0) {
+          const current = queue.pop()!;
+          ids.push(current);
+          const children = await Db.select<{ id: number }>(
+            'SELECT id FROM project_subscriptions WHERE parent_id = ?',
+            [current]
+          );
+          for (const child of children) {
+            queue.push(child.id);
+          }
+        }
+        if (ids.length === 0) return;
+        const placeholders = ids.map(() => '?').join(', ');
+        await Db.execute(
+          `DELETE FROM project_subscriptions WHERE id IN (${placeholders})`,
+          ids
+        );
+      });
     });
   },
 

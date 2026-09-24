@@ -16,21 +16,57 @@ crée les index. `migrate()` positionne ensuite `PRAGMA user_version = 15`.
 
 ## Vue relationnelle
 
+Le modèle est présenté par domaine. Cette séparation évite que les relations de facturation, de
+dons et de comptabilité se croisent dans un diagramme unique.
+
+### Transactions
+
+```mermaid
+erDiagram
+    accounts ||--o{ transactions : porte
+    imports o|--o{ transactions : origine
+```
+
+### Imports et modèles
+
 ```mermaid
 erDiagram
     accounts ||--o{ imports : contient
-    accounts ||--o{ transactions : porte
-    imports o|--o{ transactions : origine
     accounts o|--o{ import_templates : modèle
+```
+
+### Prévisionnel
+
+```mermaid
+erDiagram
     projects ||--o{ project_subscriptions : contient
     project_subscriptions o|--o{ project_subscriptions : parent
+```
 
+### Contacts et facturation
+
+```mermaid
+erDiagram
     clients ||--o{ devis : "client_id logique"
     clients ||--o{ factures : "client_id logique"
     devis o|--o{ factures : "devis_origine logique"
+```
+
+### Dons
+
+#### Modèle historique
+
+```mermaid
+erDiagram
     donateurs ||--o{ dons_manuels : "donateur_id logique"
     donateurs ||--o{ donateur_transactions : "donateur_id logique"
     transactions ||--o| donateur_transactions : "transaction_id logique"
+```
+
+#### Journal unifié
+
+```mermaid
+erDiagram
     clients ||--o{ donations : "contact donateur"
     transactions ||--o| donations : "don bancaire"
     clients ||--o{ donation_rules : "corrélation régulière"
@@ -140,11 +176,13 @@ facture. Les index accélèrent recherches par client et numéro.
 Le champ `kind` sépare `facturation` et `association`. Le payload contient respectivement un poste
 matériel/travail ou un groupe de postes.
 
-## Association
+## Dons et configuration associative
+
+Tables du domaine dons (page `#/dons` + Organisation + Registre). Pas de « page Association ».
 
 | Table | Contenu |
 |---|---|
-| `association_config` | Singleton `AssociationConfig` |
+| `association_config` | Singleton `AssociationConfig` (Paramètres → Organisation) |
 | `donateurs` | Payload `Donateur` et date de mise à jour |
 | `donateur_transactions` | Une transaction liée à au plus un donateur |
 | `dons_manuels` | Don hors transaction bancaire |
@@ -186,6 +224,16 @@ Activation **par profil** des mods globaux `data/plugins/{id}/`.
 | `plugin_id` | PK, identifiant du `manifest.json` |
 | `enabled` | 0/1 |
 | `applied_at` | ISO de la dernière application (packs catégories / mentions / import) |
+
+### Immobilisations / amortissement (v16–v17)
+
+| Table | Contenu |
+|---|---|
+| `immobilisations` | Registre des biens amortissables (VA HT, durée, méthode, statut, subvention, faible valeur) |
+| `amortissement_settings` | Singleton id=1 : barème de durées, seuil 500 €, prorata, méthode défaut (JSON `payload`) |
+| `immobilisation_attachments` (v17) | Pièces jointes liées à une immobilisation (PDF, e-mail, image) |
+
+Index : `idx_immo_statut`, `idx_immo_type`, `idx_immo_mise_en_service`, `idx_immo_attachments_immo`.
 
 ## Payloads JSON
 
@@ -229,3 +277,4 @@ flowchart LR
 | `app_settings` | `FinanceSettingsService` (et réglages profil) |
 | `category_groups` | `ConfigService` |
 | `plugin_state` | `PluginService` |
+| `immobilisations`, `amortissement_settings`, `immobilisation_attachments` | `AmortissementService` |

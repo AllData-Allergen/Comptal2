@@ -16,7 +16,7 @@ type UpdateState =
 
 const AboutTab: React.FC = () => {
   const { t } = useTranslation();
-  const version = Logger.session?.appVersion ?? '2.1.0';
+  const version = Logger.session?.appVersion ?? '2.1.2';
   const [state, setState] = useState<UpdateState>({ phase: 'idle' });
 
   const handleCheck = async () => {
@@ -93,9 +93,6 @@ const AboutTab: React.FC = () => {
         </h3>
 
         <div className="flex flex-col gap-4">
-          <p className="text-sm" style={{ color: 'var(--invoicing-gray-700)' }}>
-            {t('settings.about.profilesPreserved')}
-          </p>
           <div>
             <button
               className="ct-btn-primary"

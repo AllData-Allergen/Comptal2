@@ -143,12 +143,18 @@ function where(filters: StatsFilters, alias = 't'): { sql: string; params: unkno
   return { sql: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '', params };
 }
 
+/** Semaine ISO (année-semaine du jeudi), alignée sur `getPeriodKey(..., 'week')`. */
+export function isoYearWeekExpr(column: string): string {
+  const thursday = `date(${column}, '-3 days', 'weekday 4')`;
+  return `printf('%s-W%02d', strftime('%Y', ${thursday}), (CAST(strftime('%j', ${thursday}) AS INTEGER) - 1) / 7 + 1)`;
+}
+
 export function strftimeExpr(granularity: ChartGranularity, column = 't.date'): string {
   switch (granularity) {
     case 'day':
-      return column;
+      return `date(${column})`;
     case 'week':
-      return `strftime('%Y-W%W', ${column})`;
+      return isoYearWeekExpr(column);
     case 'month':
       return `strftime('%Y-%m', ${column})`;
     case 'quarter':
@@ -243,7 +249,7 @@ export const StatsService = {
            COALESCE(SUM(-t.debit), 0) AS expenses,
            COUNT(*) AS n,
            COALESCE(MAX(t.credit), 0) AS largestIncome,
-           COALESCE(MAX(t.debit), 0) AS largestExpense,
+           COALESCE(MAX(CASE WHEN t.debit < 0 THEN -t.debit ELSE NULL END), 0) AS largestExpense,
            COALESCE(AVG(ABS(t.debit) + ABS(t.credit)), 0) AS avgAmount
          FROM transactions t ${sql}`,
         params

@@ -129,22 +129,31 @@ Construits par `baseFilters()` et `filters()` :
 
 ## Schéma d'appel édition
 
+### Chargement et composants de page
+
 ```mermaid
-flowchart TD
+flowchart LR
     PAGE[Edition.tsx] --> LOAD[EditionService.list / count]
     PAGE --> TABLE[TransactionTable]
-    TABLE --> MUT{Mutation}
-    MUT --> UPDATE[update]
-    MUT --> INSERT[insert]
-    MUT --> DELETE[remove]
-    UPDATE --> LEARN[AutoCategorisationService.learn]
-    UPDATE --> HIST[useEditionHistory.push]
-    INSERT --> HIST
-    DELETE --> HIST
-    HIST --> UNDO{Annuler / refaire}
-    UNDO --> REPLAY[update / restore / remove]
     TABLE --> WIDTH[EditionUiService.saveColumnWidths]
     PAGE --> CAT[CategoryPanel → ConfigService]
+```
+
+### Mutation et historique
+
+```mermaid
+flowchart LR
+    MUT{Action utilisateur} -->|Modifier| UPDATE[EditionService.update]
+    MUT -->|Insérer| INSERT[EditionService.insert]
+    MUT -->|Supprimer| DELETE[EditionService.remove]
+
+    UPDATE --> LEARN[Apprendre la catégorie]
+    LEARN --> HIST[Ajouter à l'historique]
+    INSERT --> HIST
+    DELETE --> HIST
+    HIST --> UNDO{Annuler ou refaire ?}
+    UNDO -->|Oui| REPLAY[update / restore / remove]
+    UNDO -->|Non| DONE[Continuer l'édition]
 ```
 
 ---

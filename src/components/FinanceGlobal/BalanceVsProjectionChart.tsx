@@ -12,6 +12,8 @@ import {
   chartGridColor,
   chartTooltipTheme,
 } from '../../utils/chartPastel';
+import { periodXTicks } from '../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../Common/ScrollablePeriodChart';
 import '../../utils/registerCharts';
 
 interface BalanceVsProjectionChartProps {
@@ -30,10 +32,6 @@ const BalanceVsProjectionChart: React.FC<BalanceVsProjectionChartProps> = React.
     const { theme } = useTheme();
     const isDarkMode = theme === 'dark';
     const chartRef = useRef<ChartJS<'line'>>(null);
-    const tickGranularity =
-      granularity === 'day' || granularity === 'week' || granularity === 'month'
-        ? granularity
-        : 'month';
 
     const calculateYAxisLimits = useCallback((datasets: Array<{ data: number[] }>) => {
       let minValue = Infinity;
@@ -104,10 +102,7 @@ const BalanceVsProjectionChart: React.FC<BalanceVsProjectionChartProps> = React.
               color: chartGridColor(isDarkMode),
             },
             ticks: {
-              color: chartAxisColor(isDarkMode),
-              maxRotation: tickGranularity === 'day' ? 45 : 0,
-              minRotation: tickGranularity === 'day' ? 45 : 0,
-              font: { size: 11 },
+              ...periodXTicks(granularity, chartAxisColor(isDarkMode)),
             },
           },
           y: {
@@ -171,7 +166,7 @@ const BalanceVsProjectionChart: React.FC<BalanceVsProjectionChartProps> = React.
           },
         },
       }),
-      [initialLimits, calculateYAxisLimits, isDarkMode, tickGranularity, t]
+      [initialLimits, calculateYAxisLimits, isDarkMode, granularity, t]
     );
 
     if (labels.length === 0) {
@@ -184,7 +179,9 @@ const BalanceVsProjectionChart: React.FC<BalanceVsProjectionChartProps> = React.
 
     return (
       <div className="chart-canvas-wrap" style={{ width: '100%', height: '100%' }}>
-        <Line ref={chartRef} data={{ labels, datasets }} options={options} />
+        <ScrollablePeriodChart granularity={granularity} labelCount={labels.length}>
+          <Line ref={chartRef} data={{ labels, datasets }} options={options} />
+        </ScrollablePeriodChart>
       </div>
     );
   }

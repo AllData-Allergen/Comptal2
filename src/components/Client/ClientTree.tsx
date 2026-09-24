@@ -217,7 +217,7 @@ const ClientTree: React.FC = () => {
             <small>{client.type === 'entreprise' ? t('org.typeEntreprise') : t('org.typePart')}</small>
           </span>
           <span className="inv-badge">{client.codeClient}</span>
-          {client.roles?.includes('donateur') && <span className="inv-badge contact-donor-badge">Donateur</span>}
+          {client.roles?.includes('donateur') && <span className="inv-badge contact-donor-badge">{t('clients.roleDonor')}</span>}
           <span className="inv-row-meta">
             {client.email && <><Mail size={13} /> {client.email}</>}
             {client.telephone && <><Phone size={13} /> {client.telephone}</>}

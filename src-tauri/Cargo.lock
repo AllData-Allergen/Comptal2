@@ -590,11 +590,14 @@ dependencies = [
 
 [[package]]
 name = "comptal21"
-version = "2.1.0"
+version = "2.1.2"
 dependencies = [
  "chrono",
+ "hex",
+ "hmac",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

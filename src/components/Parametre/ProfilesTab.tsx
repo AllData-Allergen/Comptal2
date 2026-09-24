@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { UserPlus, Check, Pencil, Trash2, Download, Upload as UploadIcon } from 'lucide-react';
+import { UserPlus, Check, Pencil, Trash2, Download, Upload as UploadIcon, Lock, Loader2 } from 'lucide-react';
 import { ProfileInfo } from '../../types/models';
 import { ProfileService } from '../../services/ProfileService';
 import { SettingsService } from '../../services/SettingsService';
@@ -22,10 +22,13 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
   );
   const [newName, setNewName] = useState('');
   const [newUsage, setNewUsage] = useState<UsageMode>('tpe');
+  const [newLocked, setNewLocked] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<ProfileInfo | null>(null);
+  const [lockTarget, setLockTarget] = useState<ProfileInfo | null>(null);
   const [busy, setBusy] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -57,9 +60,18 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
   const handleCreate = () =>
     run(async () => {
       if (!newName.trim()) return;
-      await ProfileService.create(newName, newUsage);
+      const locked = newLocked && (newUsage === 'tpe' || newUsage === 'association');
+      await ProfileService.create(newName, newUsage, locked);
       setNewName('');
+      setNewLocked(false);
     }, t('settings.profiles.created'));
+
+  const handleLock = () =>
+    run(async () => {
+      if (!lockTarget) return;
+      await ProfileService.lockUsageMode(lockTarget.id);
+      setLockTarget(null);
+    }, t('settings.profiles.locked'));
 
   const handleActivate = (id: string) =>
     run(async () => {
@@ -104,19 +116,24 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
       filters: [{ name: 'ZIP', extensions: ['zip'] }],
     });
     if (typeof zip !== 'string') return;
-    await run(async () => {
-      const { profile, migration } = await ProfileService.importZip(zip);
-      await ProfileService.setActive(profile.id);
-      onProfileChanged();
-      if (migration && migration.rowsImported > 0) {
-        toast.info(
-          t('settings.data.migrationDone', {
-            rows: migration.rowsImported,
-            files: migration.filesImported,
-          })
-        );
-      }
-    }, t('settings.profiles.imported'));
+    setIsImporting(true);
+    try {
+      await run(async () => {
+        const { profile, migration } = await ProfileService.importZip(zip);
+        await ProfileService.setActive(profile.id);
+        onProfileChanged();
+        if (migration && migration.rowsImported > 0) {
+          toast.info(
+            t('settings.data.migrationDone', {
+              rows: migration.rowsImported,
+              files: migration.filesImported,
+            })
+          );
+        }
+      }, t('settings.profiles.imported'));
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   return (
@@ -171,10 +188,15 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
                   <div className="text-xs" style={{ color: 'var(--invoicing-gray-500)' }}>
                     {profile.id}
                   </div>
+                  {profile.usageLocked && (
+                    <div className="text-xs mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--invoicing-gray-200)', color: 'var(--invoicing-gray-800)', border: '1px solid var(--invoicing-gray-400)' }}>
+                      <Lock size={12} /> {t('settings.profiles.lockedBadge')}
+                    </div>
+                  )}
                   <select
                     className="ct-select mt-2 text-sm"
                     value={parseUsageMode(profile.usageMode, 'tpe')}
-                    disabled={busy}
+                    disabled={busy || Boolean(profile.usageLocked)}
                     onChange={(e) =>
                       void run(
                         () => ProfileService.setUsageMode(profile.id, e.target.value as UsageMode),
@@ -188,6 +210,11 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
                       </option>
                     ))}
                   </select>
+                  {!profile.usageLocked && (parseUsageMode(profile.usageMode, 'tpe') === 'tpe' || parseUsageMode(profile.usageMode, 'tpe') === 'association') && (
+                    <button className="ct-btn-secondary !py-1 !px-2 text-xs mt-2" disabled={busy} onClick={() => setLockTarget(profile)}>
+                      <Lock size={12} /> {t('settings.profiles.lockAction')}
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -245,7 +272,11 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
           <select
             className="ct-select"
             value={newUsage}
-            onChange={(e) => setNewUsage(e.target.value as UsageMode)}
+            onChange={(e) => {
+              const v = e.target.value as UsageMode;
+              setNewUsage(v);
+              if (v === 'familiale') setNewLocked(false);
+            }}
           >
             {USAGE_MODES.map((mode) => (
               <option key={mode} value={mode}>
@@ -253,6 +284,12 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
               </option>
             ))}
           </select>
+          {(newUsage === 'tpe' || newUsage === 'association') && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={newLocked} onChange={(e) => setNewLocked(e.target.checked)} />
+              {t('settings.profiles.lockAtCreate', { mode: t(`settings.profiles.usage.${newUsage}`) })}
+            </label>
+          )}
           <button
             className="ct-btn-primary"
             disabled={busy || !newName.trim()}
@@ -260,8 +297,9 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
           >
             <UserPlus size={16} /> {t('settings.profiles.create')}
           </button>
-          <button className="ct-btn-secondary" disabled={busy} onClick={() => void handleImport()}>
-            <UploadIcon size={16} /> {t('settings.profiles.import')}
+          <button className="ct-btn-secondary" disabled={busy || isImporting} onClick={() => void handleImport()}>
+            {isImporting ? <Loader2 size={16} className="animate-spin" /> : <UploadIcon size={16} />}
+            {isImporting ? t('settings.profiles.importing') : t('settings.profiles.import')}
           </button>
         </div>
       </section>
@@ -272,6 +310,14 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
         message={`${deleteTarget?.name ?? ''} — ${t('settings.profiles.deleteConfirmMessage')}`}
         onConfirm={() => void handleDelete()}
         onCancel={() => setDeleteTarget(null)}
+      />
+      <ConfirmModal
+        isOpen={lockTarget !== null}
+        title={t('settings.profiles.lockConfirmTitle')}
+        message={t('settings.profiles.lockConfirmMessage', { mode: lockTarget ? t(`settings.profiles.usage.${parseUsageMode(lockTarget.usageMode, 'tpe')}`) : '' })}
+        confirmLabel={t('settings.profiles.lockConfirmAction')}
+        onConfirm={() => void handleLock()}
+        onCancel={() => setLockTarget(null)}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { Account, Category, TransactionRow } from '../../types/models';
@@ -62,6 +62,17 @@ const EditionPage: React.FC = () => {
     word: string;
   } | null>(null);
   const [autocatPending, setAutocatPending] = useState<{ count: number; ids: number[] } | null>(null);
+  const pinnedRowIdsRef = useRef<Set<number>>(new Set());
+
+  const addPinnedRows = useCallback((ids: number[]) => {
+    const next = new Set(pinnedRowIdsRef.current);
+    ids.forEach((id) => next.add(id));
+    pinnedRowIdsRef.current = next;
+  }, []);
+
+  const clearPinnedRows = useCallback(() => {
+    pinnedRowIdsRef.current = new Set();
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearchDebounced(search), 300);
@@ -70,9 +81,17 @@ const EditionPage: React.FC = () => {
 
   const baseFilters = useCallback(
     () => ({
-      accountIds: selectedAccounts.length === accounts.length ? undefined : selectedAccounts,
+      accountIds: selectedAccounts.length === 0
+        ? undefined
+        : (selectedAccounts.length === 1 && selectedAccounts[0] === ('*' as unknown as number))
+          ? []
+          : selectedAccounts,
       categoryCodes:
-        selectedCategories.length === categories.length ? undefined : selectedCategories,
+        selectedCategories.length === 0
+          ? undefined
+          : (selectedCategories.length === 1 && selectedCategories[0] === '*')
+            ? []
+            : selectedCategories,
       dateStart: dateStart || undefined,
       dateEnd: dateEnd || undefined,
       search: searchDebounced || undefined,
@@ -119,13 +138,26 @@ const EditionPage: React.FC = () => {
         EditionService.count(f),
         EditionService.count({}),
       ]);
-      setRows(list);
+      let merged = list;
+      if (uncategorizedOnly && pinnedRowIdsRef.current.size > 0) {
+        if (count === 0) {
+          clearPinnedRows();
+        } else {
+          const pinned = await Promise.all(
+            Array.from(pinnedRowIdsRef.current).map((id) => EditionService.getById(id))
+          );
+          const pinnedRows = pinned.filter((r): r is TransactionRow => r !== null);
+          const existingIds = new Set(list.map((r) => r.id));
+          merged = [...pinnedRows.filter((r) => !existingIds.has(r.id)), ...list];
+        }
+      }
+      setRows(merged);
       setTotal(count);
       setTotalAll(dbCount);
     } catch (err) {
       Logger.error('Edition.reloadRows', err);
     }
-  }, [filters, baseFilters]);
+  }, [filters, baseFilters, uncategorizedOnly, clearPinnedRows]);
 
   const reloadAfterHistory = useCallback(async () => {
     await reloadRows();
@@ -133,6 +165,10 @@ const EditionPage: React.FC = () => {
   }, [reloadRows]);
 
   const history = useEditionHistory(reloadAfterHistory);
+
+  useEffect(() => {
+    clearPinnedRows();
+  }, [selectedAccounts, selectedCategories, uncategorizedOnly, dateStart, dateEnd, searchDebounced, clearPinnedRows]);
 
   useEffect(() => {
     void reloadMeta();
@@ -180,6 +216,9 @@ const EditionPage: React.FC = () => {
         await LabelRuleService.apply({ ids: [id] });
       }
       history.push(action);
+      if (uncategorizedOnly && fields.categoryCode && prev && !prev.categoryCode) {
+        addPinnedRows([id]);
+      }
       await reloadRows();
     } catch (err) {
       Logger.error('Edition.handleUpdate', err);
@@ -328,9 +367,78 @@ const EditionPage: React.FC = () => {
     void insertRow(ref);
   };
 
+  const handleBulkDelete = async (ids: number[]) => {
+    try {
+      const snapshots = (
+        await Promise.all(ids.map((id) => EditionService.getById(id)))
+      ).filter((r): r is TransactionRow => r !== null);
+      await EditionService.deleteIds(ids);
+      if (snapshots.length > 0) {
+        history.push({ kind: 'bulkDelete', rows: snapshots });
+      }
+      await reloadRows();
+    } catch (err) {
+      Logger.error('Edition.handleBulkDelete', err);
+      toast.error(t('common.error'));
+    }
+  };
+
+  const handleBulkCategorize = async (ids: number[], code: string) => {
+    try {
+      const items = ids
+        .map((id) => {
+          const prev = rows.find((r) => r.id === id);
+          return {
+            id,
+            before: { categoryCode: prev?.categoryCode ?? null },
+            after: { categoryCode: code },
+          };
+        })
+        .filter((item) => item.before.categoryCode !== item.after.categoryCode);
+
+      await EditionService.applyCategories(ids.map((id) => ({ id, categoryCode: code })));
+      if (items.length > 0) {
+        history.push({ kind: 'bulkUpdate', items });
+      }
+      for (const id of ids) {
+        const prev = rows.find((r) => r.id === id);
+        if (prev) await AutoCategorisationService.learn(prev.label, code);
+      }
+      if (uncategorizedOnly) {
+        addPinnedRows(ids);
+      }
+      await reloadRows();
+      toast.success(t('common.success'));
+    } catch (err) {
+      Logger.error('Edition.handleBulkCategorize', err);
+      toast.error(t('common.error'));
+    }
+  };
+
+  const handleDuplicate = async (row: TransactionRow) => {
+    try {
+      const newId = await EditionService.insert({
+        accountId: row.accountId,
+        date: row.date,
+        debit: row.debit,
+        credit: row.credit,
+        label: row.label,
+        categoryCode: row.categoryCode,
+      });
+      const newRow = await EditionService.getById(newId);
+      if (newRow) {
+        history.push({ kind: 'insert', row: newRow });
+      }
+      await reloadRows();
+    } catch (err) {
+      Logger.error('Edition.handleDuplicate', err);
+      toast.error(t('common.error'));
+    }
+  };
+
   const showEmptyUpload = totalAll === 0;
-  const showAllCategorized = uncategorizedOnly && total === 0 && totalAll > 0;
-  const showNoResults = !showEmptyUpload && !showAllCategorized && total === 0 && totalAll > 0;
+  const showAllCategorized = uncategorizedOnly && rows.length === 0 && totalAll > 0;
+  const showNoResults = !showEmptyUpload && !showAllCategorized && rows.length === 0 && totalAll > 0;
 
   return (
     <div className="edition-page">
@@ -377,6 +485,9 @@ const EditionPage: React.FC = () => {
             totalInDb={totalAll}
             onUpdate={(id, fields) => void handleUpdate(id, fields)}
             onDelete={setDeleteId}
+            onBulkDelete={(ids) => void handleBulkDelete(ids)}
+            onBulkCategorize={(ids, code) => void handleBulkCategorize(ids, code)}
+            onDuplicate={handleDuplicate}
             onInsertRelative={(refRowId, position) => handleInsertRelative(refRowId, position)}
             onRoutineLabel={(rowId, selectedText) => {
               const row = rows.find((r) => r.id === rowId);

@@ -18,6 +18,7 @@ export interface MenuVisibility {
   clients: boolean;
   association: boolean;
   register: boolean;
+  amortissement: boolean;
 }
 
 export type AppLanguage = 'fr' | 'en' | 'de';
@@ -62,6 +63,7 @@ export const DEFAULT_MENU_VISIBILITY: MenuVisibility = {
   clients: true,
   association: true,
   register: true,
+  amortissement: true,
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
