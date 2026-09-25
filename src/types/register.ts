@@ -4,7 +4,8 @@ export type RegisterDocumentType =
   | 'cashflow_summary'
   | 'donation_journal'
   | 'tax_receipt_register'
-  | 'annual_donation_statement';
+  | 'annual_donation_statement'
+  | 'amortissement_register';
 
 export const ALL_REGISTER_DOCUMENT_TYPES: RegisterDocumentType[] = [
   'donation_journal',
@@ -13,6 +14,7 @@ export const ALL_REGISTER_DOCUMENT_TYPES: RegisterDocumentType[] = [
   'reference',
   'invoice_summary',
   'cashflow_summary',
+  'amortissement_register',
 ];
 
 export const ASSOCIATION_REGISTER_TYPES: RegisterDocumentType[] = [
@@ -25,6 +27,7 @@ export const GENERAL_REGISTER_TYPES: RegisterDocumentType[] = [
   'reference',
   'invoice_summary',
   'cashflow_summary',
+  'amortissement_register',
 ];
 
 export interface RegisterSettings {
@@ -76,6 +79,8 @@ export interface RegisterSnapshotRow {
   debit?: number;
   credit?: number;
   amount?: number;
+  /** Dotation d’amortissement sur la période (type amortissement_register). */
+  periodCharge?: number;
   /** Clé i18n d’un libellé système (pas une donnée saisie). */
   labelKey?: string;
   detailKey?: string;
@@ -108,6 +113,11 @@ export interface RegisterSnapshot {
     natureNumeraire?: number;
     natureInKind?: number;
     natureSkills?: number;
+    immoBrut?: number;
+    immoAmorti?: number;
+    immoVnc?: number;
+    immoDotation?: number;
+    immoCount?: number;
   };
 }
 

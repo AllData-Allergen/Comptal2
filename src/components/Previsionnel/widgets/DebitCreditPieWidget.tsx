@@ -6,12 +6,14 @@ import { BreakdownSlice } from '../../../types/forecast';
 import { formatMoney } from '../../../utils/amounts';
 import { useTheme } from '../../../hooks/useTheme';
 import { chartAxisColor, chartPastelNamed, chartSurfaceColor, chartTooltipTheme } from '../../../utils/chartPastel';
+import PrevisionnelChartFrame from '../PrevisionnelChartFrame';
 import '../../../utils/registerCharts';
 
 interface DebitCreditPieWidgetProps {
   slices: BreakdownSlice[];
 }
 
+/** Camembert de la répartition globale débits vs crédits sur toute la période projetée. */
 const DebitCreditPieWidget: React.FC<DebitCreditPieWidgetProps> = ({ slices }) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -51,10 +53,11 @@ const DebitCreditPieWidget: React.FC<DebitCreditPieWidgetProps> = ({ slices }) =
     () => ({
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: 4 },
       plugins: {
         legend: {
           position: 'right',
-          labels: { color: axis },
+          labels: { color: axis, boxWidth: 12, font: { size: 11 } },
         },
         tooltip: {
           ...tooltip,
@@ -77,9 +80,9 @@ const DebitCreditPieWidget: React.FC<DebitCreditPieWidgetProps> = ({ slices }) =
   if (slices.length === 0) return <p className="previsionnel-empty-chart">—</p>;
 
   return (
-    <div className="previsionnel-chart-h">
+    <PrevisionnelChartFrame>
       <Pie data={data} options={options} />
-    </div>
+    </PrevisionnelChartFrame>
   );
 };
 

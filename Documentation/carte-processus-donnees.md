@@ -6,65 +6,58 @@ Ce document décrit comment les données circulent dans Comptal2.1 : du démarra
 
 ## 1. Vue globale
 
+La vue est volontairement séparée en trois schémas. Chaque schéma se lit de gauche à droite et
+répond à une seule question : comment l'application démarre, comment les données entrent, puis où
+elles sont consultées.
+
+### Démarrage et stockage technique
+
 ```mermaid
-flowchart TB
-    subgraph boot [Démarrage]
-        L[Logger.init]
-        S[SettingsService.load]
-        P[ProfileService.ensureInitialized]
-        D[Db.openForProfile]
-        L --> S --> P --> D
-    end
+flowchart LR
+    L[1. Logger.init] --> S[2. SettingsService.load]
+    S --> P[3. ProfileService.ensureInitialized]
+    P --> D[4. Db.openForProfile]
 
-    subgraph persist [Persistance]
-        JSON[settings.json + info.json]
-        SQL[(comptal.db)]
-        LOGS[logs JSONL]
-        FS[tauriBridge FS/ZIP]
-    end
+    L -. écrit .-> LOGS[(logs JSONL)]
+    S -. lit / écrit .-> SETTINGS[(settings.json)]
+    P -. lit / écrit .-> INFO[(info.json)]
+    D -. ouvre .-> SQL[(comptal.db)]
+```
 
-    subgraph sources [Entrées de données]
-        CSV[Relevé CSV/Excel]
-        MAN[Saisie manuelle]
-        MIG[Migration Comptal2]
-        UI[Édition utilisateur]
-    end
+### Entrée et modification des données
 
-    subgraph pages [Pages consommatrices]
-        UP[Upload]
-        ED[Edition]
-        DASH[Dashboard]
-        FIN[Finance]
-        PREV[Prévisionnel]
-        CONTACT[Contacts]
-        INV[Facturation]
-        ASSO[Association]
-        PARAM[Paramètres]
-    end
+```mermaid
+flowchart LR
+    CSV[Relevé CSV/XLSX] --> UP[Upload]
+    MAN[Saisie manuelle] --> UP
+    UP -->|INSERT| SQL[(comptal.db)]
 
-    boot --> pages
-    S --> JSON
-    P --> JSON
-    P --> FS
-    D --> SQL
-    L --> LOGS
+    LEGACY[Dossier Comptal2] --> PARAM[Paramètres · migration]
+    PARAM -->|INSERT| SQL
 
-    CSV --> UP
-    MAN --> UP
-    MIG --> PARAM
-    UP -->|INSERT| SQL
-    ED -->|UPDATE/DELETE/INSERT| SQL
-    UI --> ED
-    PARAM -->|CRUD config| SQL
-    PARAM --> FS
+    USER[Édition utilisateur] --> EDIT[Édition]
+    EDIT -->|INSERT / UPDATE / DELETE| SQL
+```
 
-    SQL -->|agrégats SELECT| DASH
-    SQL -->|agrégats SELECT| FIN
-    PREV <-->|CRUD prévisions| SQL
-    CONTACT <-->|payloads contacts| SQL
-    INV <-->|payloads documents| SQL
-    ASSO <-->|dons et reçus| SQL
-    DASH -->|export CSV| FS
+### Analyses et export CSV
+
+```mermaid
+flowchart LR
+    SQL[(comptal.db)] -->|agrégats SELECT| DASH[Dashboard]
+    SQL -->|agrégats SELECT| FIN[Finance]
+    DASH -->|export CSV| EXPORT[Fichier choisi]
+```
+
+### Autres modules et archives
+
+```mermaid
+flowchart LR
+    SQL[(comptal.db)] <-->|CRUD prévisions| PREV[Prévisionnel]
+    SQL <-->|CRUD contacts| CONTACT[Contacts]
+    SQL <-->|CRUD documents| INV[Facturation]
+    SQL <-->|CRUD dons et reçus| DONS[Dons]
+
+    PARAM[Paramètres] -->|export / import ZIP| ARCHIVE[Archive de profil]
 ```
 
 ---
@@ -79,7 +72,7 @@ flowchart TB
 | 4 | `i18n.changeLanguage()` | Charge la langue | — |
 | 5 | `WindowService.apply()` | Applique dimensions fenêtre | — |
 | 6 | `ProfileService.ensureInitialized()` | Charge/crée profil actif | `data/profils/{id}/info.json` |
-| 7 | `Db.openForProfile(id)` | Ouvre SQLite, réparation/migrations jusqu’à v7 | `data/profils/{id}/comptal.db` |
+| 7 | `Db.openForProfile(id)` | Ouvre SQLite, réparation/migrations jusqu’à v15 | `data/profils/{id}/comptal.db` |
 
 **Changement de profil** (Paramètres → Profils) :
 1. `ProfileService.setActive(newId)`
@@ -93,19 +86,16 @@ flowchart TB
 
 ### Relations principales
 
+Les relations sont réparties par domaine afin d'éviter un graphe relationnel unique où les liens se
+superposent.
+
+#### Transactions
+
 ```mermaid
 erDiagram
     accounts ||--o{ transactions : "account_id"
-    accounts ||--o{ imports : "account_id"
     imports ||--o{ transactions : "import_id"
     categories ||--o{ transactions : "category_code"
-    projects ||--o{ project_subscriptions : "project_id"
-    accounts ||--o{ import_templates : "account_id"
-    clients ||--o{ devis : "client_id logique"
-    clients ||--o{ factures : "client_id logique"
-    devis ||--o{ factures : "devis_origine logique"
-    donateurs ||--o{ dons_manuels : "donateur_id logique"
-    donateurs ||--o{ donateur_transactions : "donateur_id logique"
 
     accounts {
         int id PK
@@ -142,12 +132,39 @@ erDiagram
         string date_end
         int row_count
     }
+```
 
-    autocat_stats {
-        string word PK
-        string category_code PK
-        int count
+#### Imports, modèles et auto-catégorisation
+
+```mermaid
+erDiagram
+    accounts ||--o{ imports : "account_id"
+    accounts ||--o{ import_templates : "account_id"
+
+    accounts {
+        int id PK
+        string code UK
     }
+
+    imports {
+        int id PK
+        int account_id FK
+        string filename
+    }
+
+    import_templates {
+        int id PK
+        string name
+        int account_id FK
+        string column_roles_json
+    }
+```
+
+#### Prévisionnel
+
+```mermaid
+erDiagram
+    projects ||--o{ project_subscriptions : "project_id"
 
     projects {
         int id PK
@@ -164,33 +181,56 @@ erDiagram
         real amount
         string periodicity
     }
-
-    import_templates {
-        int id PK
-        string name
-        int account_id FK
-        string column_roles_json
-    }
 ```
 
-Les cinq premières relations sont contraintes par SQLite lorsqu’une clause `REFERENCES` est
-présente. Les relations vers contacts, documents et donateurs sont des identifiants métier sans
-contrainte FK ; les services doivent donc préserver leur cohérence.
+#### Relations métier sans clé étrangère SQLite
+
+##### Contacts et facturation
+
+```mermaid
+erDiagram
+    clients ||--o{ devis : "client_id logique"
+    clients ||--o{ factures : "client_id logique"
+    devis ||--o{ factures : "devis_origine logique"
+```
+
+##### Dons historiques
+
+```mermaid
+erDiagram
+    donateurs ||--o{ dons_manuels : "donateur_id logique"
+    donateurs ||--o{ donateur_transactions : "donateur_id logique"
+```
+
+Les relations des trois premières vues sont contraintes par SQLite lorsqu’une clause `REFERENCES`
+est présente, à l'exception de `categories` → `transactions`. Les deux dernières vues montrent des
+identifiants métier sans contrainte FK ; les services doivent donc préserver leur cohérence.
 
 ### Tables à payload JSON
 
 ```mermaid
-flowchart LR
-    EM[invoice_emetteur] --> EJS[EmetteurExtended JSON]
-    IS[invoice_settings] --> IJS[InvoiceSettings JSON]
-    CL[clients] --> CJS[Client JSON]
-    DV[devis] --> DJS[Devis JSON]
-    FA[factures] --> FJS[Facture + paiements JSON]
-    CG[contact_groups] --> GJS[ContactGroupe JSON]
-    AC[association_config] --> AJS[AssociationConfig JSON]
-    DO[donateurs] --> DOJS[Donateur JSON]
-    DM[dons_manuels] --> DMJS[Don JSON]
-    RR[registre_recus] --> RRJS[ReceiptEntry JSON]
+flowchart TB
+    subgraph facturation [Facturation]
+        direction LR
+        EM[invoice_emetteur] --> EJS[EmetteurExtended]
+        IS[invoice_settings] --> IJS[InvoiceSettings]
+        DV[devis] --> DJS[Devis]
+        FA[factures] --> FJS[Facture + paiements]
+    end
+
+    subgraph contacts [Contacts]
+        direction LR
+        CL[clients] --> CJS[Client]
+        CG[contact_groups] --> GJS[ContactGroupe]
+    end
+
+    subgraph association [Association]
+        direction LR
+        AC[association_config] --> AJS[AssociationConfig]
+        DO[donateurs] --> DOJS[Donateur]
+        DM[dons_manuels] --> DMJS[Don]
+        RR[registre_recus] --> RRJS[ReceiptEntry]
+    end
 ```
 
 Les colonnes dédiées (`numero`, `statut`, `client_id`, `updated_at`, etc.) servent au tri et à la
@@ -212,15 +252,15 @@ recherche. Le payload est la représentation métier complète.
 ## 4. Processus d'import (Upload)
 
 ```mermaid
-flowchart LR
+flowchart TD
     A[Fichier CSV/XLSX] --> B[FileDetectionService]
     B --> C[ColumnMappingService]
     C --> D[transformRows]
     D --> E[Aperçu UI]
     E --> F{Chevauchement?}
-    F -->|Oui| G[ConfirmModal]
     F -->|Non| H[ImportService.importRows]
-    G --> H
+    F -->|Oui| G[Demander confirmation]
+    G -->|Confirmer| H
     H --> I[(INSERT transactions + imports)]
 ```
 
@@ -239,8 +279,13 @@ flowchart LR
 
 ## 5. Processus d'édition
 
+Le parcours principal, l'historique et les préférences d'affichage sont isolés : aucune flèche de
+retour ne traverse le schéma.
+
+### Chargement et modification
+
 ```mermaid
-flowchart TB
+flowchart LR
     F[Filtres UI] --> W[EditionService.buildWhere]
     W --> Q[SELECT paginé]
     Q --> T[TransactionTable]
@@ -248,11 +293,24 @@ flowchart TB
     U --> L[AutoCategorisationService.learn]
     L --> S[(UPDATE transactions)]
     S --> R[(UPSERT autocat_stats)]
-    U --> H[useEditionHistory.push]
-    H --> Z{Annuler / refaire}
-    Z --> REPLAY[update / restore / remove]
-    REPLAY --> T
-    T --> WIDTH[EditionUiService]
+```
+
+### Historique annuler / refaire
+
+```mermaid
+flowchart LR
+    U[EditionService.update] --> H[useEditionHistory.push]
+    H --> Z{Annuler / refaire ?}
+    Z -->|Oui| REPLAY[update / restore / remove]
+    REPLAY --> REFRESH[Recharger les lignes visibles]
+    Z -->|Non| CONTINUE[Continuer l'édition]
+```
+
+### Préférences du tableau
+
+```mermaid
+flowchart LR
+    T[TransactionTable] --> WIDTH[EditionUiService]
     WIDTH --> PREF[edition_ui.json du profil]
 ```
 
@@ -300,17 +358,36 @@ flowchart LR
 
 ## 7. Processus prévisionnel
 
+Les flux de grille, de calcul et de mutation sont séparés ; aucune liaison diagonale ne traverse
+ainsi un autre parcours.
+
+### Chargement de la grille
+
 ```mermaid
 flowchart LR
     P[ProjectService.list/get] --> PS[listSubscriptionTree]
     PS --> GRID[ForecastGrid]
-    GRID -->|édition| MUT[add/update/remove/reorder]
-    MUT --> PS
-    PS --> MODEL[ForecastModel.computeForecast]
+    LAYOUT[widget_layout JSON] --> GRID
+```
+
+### Calcul des widgets
+
+```mermaid
+flowchart LR
+    PS[listSubscriptionTree] --> MODEL[ForecastModel.computeForecast]
     MODEL --> PROJ[ProjectionService]
     PROJ --> WIDGETS[Widgets statistiques et graphiques]
-    LAYOUT[widget_layout JSON] --> GRID
-    LAYOUT --> WIDGETS
+    LAYOUT[widget_layout JSON] --> WIDGETS
+```
+
+### Mutation de la grille
+
+```mermaid
+flowchart LR
+    GRID[ForecastGrid] -->|édition| MUT[add / update / remove / reorder]
+    MUT --> DB[(project_subscriptions)]
+    DB -->|rechargement| TREE[listSubscriptionTree]
+    TREE --> GRID2[Grille actualisée]
 ```
 
 - La grille transforme l’arbre persisté en lignes éditables.
@@ -341,15 +418,18 @@ flowchart TD
 `InvoiceService` assure les numéros uniques au niveau applicatif et sérialise les dates.
 `PaymentTrackingService` classe les correspondances par libellé, montant ou les deux.
 
-## 9. Processus Association
+## 9. Processus Dons (ex-page Association redistribuée)
+
+Config identité : Paramètres → Organisation. Donateur : Contacts. Journal / émission : `#/dons`.
+États figés : Registre.
 
 ```mermaid
 flowchart TD
-    CONFIG[Configuration association] --> DONOR[Créer un donateur]
+    CONFIG[Organisation — config associative] --> DONOR[Contact rôle donateur]
     DONOR --> SOURCE{Origine du don}
-    SOURCE -->|Transaction créditrice| MAP[Lier transaction ↔ donateur]
+    SOURCE -->|Transaction créditrice| MAP[Lier transaction ↔ don]
     SOURCE -->|Saisie| MANUAL[Créer un don manuel]
-    MAP --> RECEIPT[Préparer le reçu]
+    MAP --> RECEIPT[Préparer le reçu — page Dons]
     MANUAL --> RECEIPT
     RECEIPT --> NUM[Incrémenter RECU-année-compteur]
     NUM --> PDF[Générer le PDF fiscal]
@@ -415,7 +495,7 @@ Tout appel métier important passe par `withLog()` :
 | Prévisionnel | `ProjectService`, `ForecastModel`, `ProjectionService` | Prévisions, lignes et layout |
 | Contacts | `ClientService`, `ContactGroupService`, `InvoiceService` | Contacts et groupements |
 | Facturation | Services contacts, émetteur, postes, documents et transactions | Devis, factures, paiements, pièces jointes |
-| Association | Services donateurs, dons, reçus et postes | Configuration, dons, liens et reçus |
+| Dons | `DonationService`, reçus, config associative | Dons, liens, reçus ; config via Organisation |
 | Paramètres | Tous services config | `SettingsService`, `ProfileService`, `ConfigService`, `MigrationService`, `Db` |
 
 ---

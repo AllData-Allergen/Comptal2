@@ -31,6 +31,16 @@ const WIDGET_LABELS: Record<ForecastWidgetType, string> = {
   groupBreakdown: 'previsionnel.widgets.groupBreakdown',
 };
 
+const WIDGET_DESCRIPTIONS: Record<ForecastWidgetType, string> = {
+  stats: 'previsionnel.widgets.desc.stats',
+  balance: 'previsionnel.widgets.desc.balance',
+  debitCredit: 'previsionnel.widgets.desc.debitCredit',
+  category: 'previsionnel.widgets.desc.category',
+  lines: 'previsionnel.widgets.desc.lines',
+  cashflow: 'previsionnel.widgets.desc.cashflow',
+  groupBreakdown: 'previsionnel.widgets.desc.groupBreakdown',
+};
+
 const PrevisionnelWidgetPanel: React.FC<PrevisionnelWidgetPanelProps> = ({
   layout,
   computed,
@@ -84,7 +94,7 @@ const PrevisionnelWidgetPanel: React.FC<PrevisionnelWidgetPanelProps> = ({
       case 'stats':
         return <StatsSummaryWidget stats={computed.stats} />;
       case 'balance':
-        return <BalanceEvolutionWidget series={computed.balanceSeries} />;
+        return <BalanceEvolutionWidget series={computed.balanceSeries} granularity={layout.chartGranularity} />;
       case 'debitCredit':
         return <DebitCreditPieWidget slices={computed.debitCredit} />;
       case 'category':
@@ -145,7 +155,10 @@ const PrevisionnelWidgetPanel: React.FC<PrevisionnelWidgetPanelProps> = ({
                     checked={w.enabled}
                     onChange={(e) => toggle(w.id, e.target.checked)}
                   />
-                  {t(WIDGET_LABELS[w.type])}
+                  <span className="previsionnel-widget-list-meta">
+                    <strong>{t(WIDGET_LABELS[w.type])}</strong>
+                    <span>{t(WIDGET_DESCRIPTIONS[w.type])}</span>
+                  </span>
                 </label>
                 <span className="previsionnel-reorder">
                   <button type="button" disabled={i === 0} onClick={() => move(w.id, -1)}>
@@ -168,6 +181,8 @@ const PrevisionnelWidgetPanel: React.FC<PrevisionnelWidgetPanelProps> = ({
             <PrevisionnelWidget
               key={`${w.id}-${splitNonce}`}
               title={t(WIDGET_LABELS[w.type])}
+              description={t(WIDGET_DESCRIPTIONS[w.type])}
+              widgetType={w.type}
               onRemove={() => toggle(w.id, false)}
             >
               {renderWidget(w.type)}

@@ -1,7 +1,50 @@
 .upload-page {
-  max-width: 72rem;
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+  max-width: none;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  height: 100%;
+}
+
+.upload-page-select-grid {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .upload-page-select-grid {
+    grid-template-columns: minmax(0, 1fr) 480px;
+  }
+}
+@media (max-width: 1023px) {
+  .upload-page-select-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.upload-page-manual-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.upload-page-manual-wrap .edition-excel-scroller {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.upload-page .ct-card {
+  min-width: 0;
 }
 
 .upload-stepper {
@@ -162,6 +205,25 @@ html.dark .upload-status-icon.error {
 html.dark .upload-column-row {
   background-color: var(--invoicing-gray-100);
   border-color: var(--invoicing-gray-300);
+}
+
+.upload-missing-cat-card {
+  padding: 1rem;
+  border: 1px solid var(--invoicing-gray-200);
+  border-radius: 8px;
+  background-color: var(--invoicing-gray-50);
+}
+
+.dark .upload-missing-cat-card,
+html.dark .upload-missing-cat-card {
+  background-color: var(--invoicing-gray-100);
+  border-color: var(--invoicing-gray-300);
+}
+
+.upload-missing-cat-card .ct-btn-secondary.is-active-mode {
+  border-color: var(--invoicing-primary);
+  color: var(--invoicing-primary);
+  background-color: color-mix(in srgb, var(--invoicing-primary) 12%, transparent);
 }
 
 .upload-or-divider {

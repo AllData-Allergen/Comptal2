@@ -8,6 +8,7 @@ import {
   FileCheck2,
   FilePlus2,
   FileText,
+  Landmark,
   Link2,
   Paperclip,
   Plus,
@@ -49,10 +50,20 @@ const TYPE_ICONS: Record<RegisterDocumentType, React.ReactNode> = {
   reference: <FileText size={20} />,
   invoice_summary: <ReceiptText size={20} />,
   cashflow_summary: <FileBarChart size={20} />,
+  amortissement_register: <Landmark size={20} />,
   donation_journal: <BookOpenCheck size={20} />,
   tax_receipt_register: <ReceiptText size={20} />,
   annual_donation_statement: <FileCheck2 size={20} />,
 };
+
+const COUNT_TOTAL_KEYS = new Set([
+  'donationCount',
+  'receiptCount',
+  'cancelledReceipts',
+  'particuliers',
+  'entreprises',
+  'immoCount',
+]);
 
 const kindOf = (document: RegisterDocument) => RegisterService.documentKind(document);
 
@@ -433,7 +444,7 @@ const Register: React.FC = () => {
                   <div className="register-kpis">
                     {Object.entries(selected.snapshot.totals).map(([key, value]) => (
                       <div key={key}><span>{totalLabel(key)}</span><strong>{
-                        ['donationCount', 'receiptCount', 'cancelledReceipts', 'particuliers', 'entreprises'].includes(key)
+                        COUNT_TOTAL_KEYS.has(key)
                           ? Number(value)
                           : formatMoney(Number(value))
                       }</strong></div>
@@ -445,7 +456,18 @@ const Register: React.FC = () => {
                   <div className="register-snapshot">
                     <h3><CalendarRange size={16} /> {t('register.frozenData')}</h3>
                     <table><thead><tr>
-                      {ASSOCIATION_REGISTER_TYPES.includes(kindOf(selected)) ? (
+                      {kindOf(selected) === 'amortissement_register' ? (
+                        <>
+                          <th>{t('register.colLabel')}</th>
+                          <th>{t('register.colDetail')}</th>
+                          <th>{t('register.colExtra')}</th>
+                          <th>{t('common.status')}</th>
+                          <th>{t('register.colImmoBrut')}</th>
+                          <th>{t('register.colImmoAmorti')}</th>
+                          <th>{t('register.colImmoDotation')}</th>
+                          <th>{t('register.colImmoVnc')}</th>
+                        </>
+                      ) : ASSOCIATION_REGISTER_TYPES.includes(kindOf(selected)) ? (
                         <>
                           <th>{t('register.colLabel')}</th>
                           <th>{t('register.colDetail')}</th>
@@ -466,7 +488,16 @@ const Register: React.FC = () => {
                         <tr key={`${row.label}-${index}`}>
                           <td>{registerRowLabel(row)}</td>
                           <td>{registerRowDetail(row) || '—'}</td>
-                          {ASSOCIATION_REGISTER_TYPES.includes(kindOf(selected)) ? (
+                          {kindOf(selected) === 'amortissement_register' ? (
+                            <>
+                              <td>{registerRowExtra(row) || '—'}</td>
+                              <td>{registerStatusLabel(row.status) || '—'}</td>
+                              <td>{row.credit != null ? formatMoney(row.credit) : '—'}</td>
+                              <td>{row.debit != null ? formatMoney(row.debit) : '—'}</td>
+                              <td>{row.periodCharge != null ? formatMoney(row.periodCharge) : '—'}</td>
+                              <td>{row.amount != null ? formatMoney(Number(row.amount)) : '—'}</td>
+                            </>
+                          ) : ASSOCIATION_REGISTER_TYPES.includes(kindOf(selected)) ? (
                             <>
                               <td>{registerRowExtra(row) || '—'}</td>
                               <td className={row.status === 'Annulé' || row.status === 'cancelled' ? 'is-cancelled' : undefined}>

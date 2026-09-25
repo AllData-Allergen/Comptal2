@@ -9,6 +9,7 @@ export interface DashboardChartWidgets {
   invoiceVsPayment: boolean;
   invoiceAging: boolean;
   donationsByDonor: boolean;
+  amortissement: boolean;
 }
 
 export interface DashboardSummaryWidgets {
@@ -34,9 +35,11 @@ export interface DashboardSettingsContext {
   associationMenu: boolean;
   contactsMenu: boolean;
   registerMenu: boolean;
+  amortissementMenu: boolean;
   emetteurType?: string | null;
   hasInvoices: boolean;
   hasDonations: boolean;
+  hasImmobilisations: boolean;
 }
 
 export type LegalReminderSeverity = 'info' | 'warn' | 'urgent';

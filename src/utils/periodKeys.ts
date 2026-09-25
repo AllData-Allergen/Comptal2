@@ -6,14 +6,16 @@ import {
   format,
   getISOWeek,
   getISOWeekYear,
-  getWeek,
-  getYear,
   isValid,
   parse,
   parseISO,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ChartGranularity } from '../types/projection';
+
+function isoDatePart(key: string): string {
+  return key.slice(0, 10);
+}
 
 export function getPeriodKey(date: Date, granularity: ChartGranularity): string {
   switch (granularity) {
@@ -54,9 +56,9 @@ export function getPreviousGranularity(current: ChartGranularity): ChartGranular
 export function parsePeriodKeyToDate(key: string, granularity: ChartGranularity): Date {
   switch (granularity) {
     case 'day':
-      return parse(key, 'yyyy-MM-dd', new Date());
+      return parse(isoDatePart(key), 'yyyy-MM-dd', new Date());
     case 'week': {
-      const match = key.match(/^(\d{4})-W(\d{2})$/);
+      const match = key.match(/^(\d{4})-W(\d{1,2})$/);
       if (match) {
         const year = Number(match[1]);
         const week = Number(match[2]);
@@ -66,7 +68,7 @@ export function parsePeriodKeyToDate(key: string, granularity: ChartGranularity)
         weekStart.setDate(jan4.getDate() - day + 1 + (week - 1) * 7);
         return weekStart;
       }
-      return parse(key, 'yyyy-MM-dd', new Date());
+      return parse(isoDatePart(key), 'yyyy-MM-dd', new Date());
     }
     case 'month':
       return parse(`${key}-01`, 'yyyy-MM-dd', new Date());
@@ -95,11 +97,12 @@ export function getPeriodLabel(key: string, granularity: ChartGranularity): stri
   try {
     switch (granularity) {
       case 'day':
-        return format(parse(key, 'yyyy-MM-dd', new Date()), 'd MMM yyyy', { locale: fr });
+        return format(parsePeriodKeyToDate(key, 'day'), 'dd/MM/yy');
       case 'week': {
         const d = parsePeriodKeyToDate(key, granularity);
-        const weekNum = getWeek(d, { weekStartsOn: 1, firstWeekContainsDate: 4 });
-        return `Sem. ${weekNum} ${getYear(d)}`;
+        const weekNum = String(getISOWeek(d)).padStart(2, '0');
+        const year = String(getISOWeekYear(d)).slice(-2);
+        return `S${weekNum}/${year}`;
       }
       case 'month':
         return format(parse(`${key}-01`, 'yyyy-MM-dd', new Date()), 'MMM yyyy', { locale: fr });
@@ -115,6 +118,22 @@ export function getPeriodLabel(key: string, granularity: ChartGranularity): stri
   } catch {
     return key;
   }
+}
+
+/** Libellé long pour infobulles (jour / semaine). */
+export function getPeriodFullLabel(key: string, granularity: ChartGranularity): string {
+  try {
+    if (granularity === 'day') {
+      return format(parsePeriodKeyToDate(key, 'day'), 'd MMM yyyy', { locale: fr });
+    }
+    if (granularity === 'week') {
+      const d = parsePeriodKeyToDate(key, 'week');
+      return `Sem. ${getISOWeek(d)} ${getISOWeekYear(d)}`;
+    }
+  } catch {
+    return getPeriodLabel(key, granularity);
+  }
+  return getPeriodLabel(key, granularity);
 }
 
 export function enumeratePeriodKeys(

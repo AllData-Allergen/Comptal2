@@ -11,6 +11,7 @@ import {
   Contact,
   HeartHandshake,
   BookOpenCheck,
+  Landmark,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -19,6 +20,7 @@ import {
 import { MenuVisibility } from '../../types/settings';
 import { SettingsService } from '../../services/SettingsService';
 import { ProfileService } from '../../services/ProfileService';
+import { Logger } from '../../services/logger';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -42,6 +44,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/facturation', icon: FileText, labelKey: 'navigation.invoicing', visibilityKey: 'invoicing' },
   { path: '/dons', icon: HeartHandshake, labelKey: 'navigation.association', visibilityKey: 'association' },
   { path: '/registre', icon: BookOpenCheck, labelKey: 'navigation.register', visibilityKey: 'register' },
+  { path: '/amortissement', icon: Landmark, labelKey: 'navigation.amortissement', visibilityKey: 'amortissement' },
   { path: '/parametre', icon: Settings, labelKey: 'navigation.settings', visibilityKey: null },
 ];
 
@@ -63,6 +66,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
         clients: true,
         association: true,
         register: true,
+        amortissement: true,
       };
     }
   });
@@ -146,7 +150,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
               {t('settings.profiles.active')}: {profileName}
             </p>
           )}
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">Version 2.1.0</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            Version {Logger.session?.appVersion ?? '2.1.2'}
+          </p>
         </div>
       )}
     </aside>

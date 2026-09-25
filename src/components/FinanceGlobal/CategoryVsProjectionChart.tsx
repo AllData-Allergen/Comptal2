@@ -9,6 +9,9 @@ import {
   chartTooltipTheme,
 } from '../../utils/chartPastel';
 import '../../utils/registerCharts';
+import { ChartGranularity } from '../../types/projection';
+import { periodXTicks } from '../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../Common/ScrollablePeriodChart';
 
 function createHatchingPattern(
   ctx: CanvasRenderingContext2D,
@@ -46,6 +49,7 @@ interface CategoryVsProjectionChartProps {
   projection: number[];
   color: string;
   categoryName: string;
+  granularity: ChartGranularity;
 }
 
 const CategoryVsProjectionChart: React.FC<CategoryVsProjectionChartProps> = ({
@@ -54,6 +58,7 @@ const CategoryVsProjectionChart: React.FC<CategoryVsProjectionChartProps> = ({
   projection,
   color,
   categoryName,
+  granularity,
 }) => {
   const { t } = useTranslation();
   const chartRef = useRef<ChartJS<'bar'>>(null);
@@ -130,10 +135,8 @@ const CategoryVsProjectionChart: React.FC<CategoryVsProjectionChartProps> = ({
           stacked: false,
           grid: { display: false },
           ticks: {
+            ...periodXTicks(granularity, chartAxisColor(isDarkMode)),
             font: { size: 11, weight: 'bold' },
-            color: chartAxisColor(isDarkMode),
-            maxRotation: 45,
-            minRotation: 45,
           },
         },
         y: {
@@ -184,7 +187,7 @@ const CategoryVsProjectionChart: React.FC<CategoryVsProjectionChartProps> = ({
         },
       },
     }),
-    [yAxisLimits, isDarkMode, t, categoryName]
+    [yAxisLimits, isDarkMode, t, categoryName, granularity]
   );
 
   if (labels.length === 0) {
@@ -197,7 +200,9 @@ const CategoryVsProjectionChart: React.FC<CategoryVsProjectionChartProps> = ({
 
   return (
     <div className="chart-canvas-wrap" style={{ width: '100%', height: '100%' }}>
-      <Bar ref={chartRef} data={{ labels, datasets }} options={options} />
+      <ScrollablePeriodChart granularity={granularity} labelCount={labels.length}>
+        <Bar ref={chartRef} data={{ labels, datasets }} options={options} />
+      </ScrollablePeriodChart>
     </div>
   );
 };

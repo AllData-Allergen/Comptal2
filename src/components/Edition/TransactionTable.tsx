@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
-import { Funnel, Trash2 } from 'lucide-react';
+import { Funnel, Trash2, Copy, Tag } from 'lucide-react';
 import { Account, Category, TransactionRow } from '../../types/models';
 import {
   DEFAULT_EDITION_COLUMN_WIDTHS,
@@ -32,6 +32,9 @@ interface TransactionTableProps {
   totalInDb?: number;
   onUpdate: (id: number, fields: Partial<TransactionRow>) => void;
   onDelete: (id: number) => void;
+  onBulkDelete: (ids: number[]) => void;
+  onBulkCategorize: (ids: number[], code: string) => void;
+  onDuplicate: (row: TransactionRow) => Promise<void> | void;
   onInsertRelative: (refRowId: number, position: 'above' | 'below') => void;
   onRoutineLabel: (rowId: number, selectedText?: string) => void;
   sortBy: string;
@@ -119,6 +122,9 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   totalInDb,
   onUpdate,
   onDelete,
+  onBulkDelete,
+  onBulkCategorize,
+  onDuplicate,
   onInsertRelative,
   onRoutineLabel,
   sortBy,
@@ -150,6 +156,11 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
   const [filterSelections, setFilterSelections] = useState<Partial<Record<SortCol, Set<string>>>>(
     {}
   );
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<number>>(new Set());
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartIndex, setDragStartIndex] = useState<number | null>(null);
+  const [bulkCatOpen, setBulkCatOpen] = useState(false);
 
   const displayRows = useMemo(() => {
     const active = Object.entries(filterSelections) as Array<[SortCol, Set<string>]>;
@@ -286,8 +297,123 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
     };
   }, [shouldVirtualize, displayRows.length, visibleRange.start, visibleRows.length]);
 
+  const selectRange = useCallback(
+    (fromIndex: number, toIndex: number, additive: boolean) => {
+      const min = Math.min(fromIndex, toIndex);
+      const max = Math.max(fromIndex, toIndex);
+      const ids = new Set<number>();
+      for (let i = min; i <= max; i++) {
+        const row = displayRows[i];
+        if (row) ids.add(row.id);
+      }
+      setSelectedRowIds((prev) => {
+        if (additive) {
+          const next = new Set(prev);
+          ids.forEach((id) => next.add(id));
+          return next;
+        }
+        return ids;
+      });
+    },
+    [displayRows]
+  );
+
+  const handleRowMouseDown = useCallback(
+    (rowIndex: number, e: React.MouseEvent) => {
+      if (e.button !== 0) return;
+      const row = displayRows[rowIndex];
+      if (!row) return;
+      const target = e.target as HTMLElement;
+      const onFormControl = Boolean(target.closest('input, select, textarea, button'));
+      if (e.shiftKey && lastClickedIndex !== null) {
+        e.preventDefault();
+        selectRange(lastClickedIndex, rowIndex, e.ctrlKey || e.metaKey);
+        setLastClickedIndex(rowIndex);
+        return;
+      }
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        setSelectedRowIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(row.id)) next.delete(row.id);
+          else next.add(row.id);
+          return next;
+        });
+        setLastClickedIndex(rowIndex);
+        return;
+      }
+      setSelectedRowIds(new Set([row.id]));
+      setLastClickedIndex(rowIndex);
+      if (!onFormControl) {
+        setIsDragging(true);
+        setDragStartIndex(rowIndex);
+      }
+    },
+    [displayRows, lastClickedIndex, selectRange]
+  );
+
+  const handleRowMouseEnter = useCallback(
+    (rowIndex: number) => {
+      if (!isDragging || dragStartIndex === null) return;
+      selectRange(dragStartIndex, rowIndex, false);
+    },
+    [isDragging, dragStartIndex, selectRange]
+  );
+
+  const stopDragging = useCallback(() => {
+    setIsDragging(false);
+    setDragStartIndex(null);
+  }, []);
+
   useEffect(() => {
-    const close = () => setContextMenu(null);
+    if (!isDragging) return;
+    const onMouseUp = () => stopDragging();
+    document.addEventListener('mouseup', onMouseUp);
+    return () => document.removeEventListener('mouseup', onMouseUp);
+  }, [isDragging, stopDragging]);
+
+  const contextRowIds = useMemo(() => {
+    if (!contextMenu) return [];
+    const clicked = displayRows.find((r) => r.id === contextMenu.rowId);
+    if (!clicked) return [contextMenu.rowId];
+    if (selectedRowIds.has(contextMenu.rowId)) {
+      return Array.from(selectedRowIds);
+    }
+    return [contextMenu.rowId];
+  }, [contextMenu, displayRows, selectedRowIds]);
+
+  const isMultiSelection = contextRowIds.length > 1;
+
+  const handleBulkDelete = () => {
+    if (contextRowIds.length === 0) return;
+    onBulkDelete(contextRowIds);
+    setContextMenu(null);
+    setSelectedRowIds(new Set());
+  };
+
+  const handleBulkCategorize = (code: string) => {
+    if (contextRowIds.length === 0) return;
+    onBulkCategorize(contextRowIds, code);
+    setContextMenu(null);
+    setBulkCatOpen(false);
+    setSelectedRowIds(new Set());
+  };
+
+  const handleDuplicate = async () => {
+    if (contextRowIds.length === 0) return;
+    const targets = rows.filter((r) => contextRowIds.includes(r.id));
+    for (const row of targets) {
+      await onDuplicate(row);
+    }
+    setContextMenu(null);
+    setSelectedRowIds(new Set());
+  };
+
+  useEffect(() => {
+    const close = () => {
+      setContextMenu(null);
+      setBulkCatOpen(false);
+    };
     window.addEventListener('click', close);
     return () => window.removeEventListener('click', close);
   }, []);
@@ -594,10 +720,14 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
 
   const renderRow = (row: TransactionRow, rowIndex: number) => {
     const isFocusedRow = focusedCell?.row === rowIndex;
+    const isSelected = selectedRowIds.has(row.id);
     return (
       <tr
         key={row.id}
         style={{ height: ROW_HEIGHT }}
+        className={isSelected ? 'edition-row-selected' : ''}
+        onMouseDown={(e) => handleRowMouseDown(rowIndex, e)}
+        onMouseEnter={() => handleRowMouseEnter(rowIndex)}
         onContextMenu={(e) => {
           e.preventDefault();
           let selectedText = '';
@@ -764,7 +894,10 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
 
   return (
     <>
-      <div ref={scrollerRef} className="edition-excel-scroller">
+      <div
+        ref={scrollerRef}
+        className={`edition-excel-scroller${isDragging ? ' edition-dragging' : ''}`}
+      >
         <table className="edition-excel-table">
           <colgroup>
             {COLUMN_KEYS.map((colKey) => (
@@ -839,41 +972,73 @@ const TransactionTable: React.FC<TransactionTableProps> = ({
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            onClick={() => {
-              onInsertRelative(contextMenu.rowId, 'above');
-              setContextMenu(null);
-            }}
-          >
-            {t('edition.insertAbove')}
+          {isMultiSelection && (
+            <div className="edition-context-menu-count">
+              {t('edition.selectedCount', { count: contextRowIds.length })}
+            </div>
+          )}
+          {!isMultiSelection && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  onInsertRelative(contextMenu.rowId, 'above');
+                  setContextMenu(null);
+                }}
+              >
+                {t('edition.insertAbove')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onInsertRelative(contextMenu.rowId, 'below');
+                  setContextMenu(null);
+                }}
+              >
+                {t('edition.insertBelow')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onRoutineLabel(contextMenu.rowId, contextMenu.selectedText);
+                  setContextMenu(null);
+                }}
+              >
+                {t('edition.routineLabel')}
+              </button>
+            </>
+          )}
+          <button type="button" onClick={handleDuplicate}>
+            <Copy size={14} /> {t('edition.duplicate')}
           </button>
           <button
             type="button"
             onClick={() => {
-              onInsertRelative(contextMenu.rowId, 'below');
-              setContextMenu(null);
+              setBulkCatOpen((v) => !v);
             }}
           >
-            {t('edition.insertBelow')}
+            <Tag size={14} /> {t('edition.categorize')}
           </button>
+          {bulkCatOpen && (
+            <div className="edition-context-menu-cats">
+              {categories.map((c) => (
+                <button
+                  key={c.code}
+                  type="button"
+                  onClick={() => handleBulkCategorize(c.code)}
+                >
+                  <CategorySwatch code={c.code} color={c.color} className="edition-category-dot" />
+                  {c.code} — {isTransferCategory(c.code) ? t('common.categoryXName') : c.name}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             type="button"
-            onClick={() => {
-              onRoutineLabel(contextMenu.rowId, contextMenu.selectedText);
-              setContextMenu(null);
-            }}
+            className="edition-context-menu-danger"
+            onClick={handleBulkDelete}
           >
-            {t('edition.routineLabel')}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              onDelete(contextMenu.rowId);
-              setContextMenu(null);
-            }}
-          >
-            {t('common.delete')}
+            <Trash2 size={14} /> {isMultiSelection ? t('edition.bulkDelete', { count: contextRowIds.length }) : t('common.delete')}
           </button>
         </div>
       )}

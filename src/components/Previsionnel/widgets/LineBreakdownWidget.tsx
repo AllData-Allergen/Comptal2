@@ -6,12 +6,14 @@ import { BreakdownSlice } from '../../../types/forecast';
 import { formatMoney } from '../../../utils/amounts';
 import { useTheme } from '../../../hooks/useTheme';
 import { chartAxisColor, chartPastel, chartSurfaceColor, chartTooltipTheme } from '../../../utils/chartPastel';
+import PrevisionnelChartFrame from '../PrevisionnelChartFrame';
 import '../../../utils/registerCharts';
 
 interface LineBreakdownWidgetProps {
   slices: BreakdownSlice[];
 }
 
+/** Anneau : part relative de chaque ligne (feuilles) dans le volume absolu projeté. */
 const LineBreakdownWidget: React.FC<LineBreakdownWidgetProps> = ({ slices }) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -44,10 +46,11 @@ const LineBreakdownWidget: React.FC<LineBreakdownWidgetProps> = ({ slices }) => 
       responsive: true,
       maintainAspectRatio: false,
       cutout: '58%',
+      layout: { padding: 4 },
       plugins: {
         legend: {
           position: 'right',
-          labels: { color: axis, boxWidth: 12 },
+          labels: { color: axis, boxWidth: 12, font: { size: 11 } },
         },
         tooltip: {
           ...tooltip,
@@ -70,9 +73,9 @@ const LineBreakdownWidget: React.FC<LineBreakdownWidgetProps> = ({ slices }) => 
   if (display.length === 0) return <p className="previsionnel-empty-chart">—</p>;
 
   return (
-    <div className="previsionnel-chart-h">
+    <PrevisionnelChartFrame>
       <Doughnut data={data} options={options} />
-    </div>
+    </PrevisionnelChartFrame>
   );
 };
 

@@ -48,10 +48,23 @@ export interface ImportRecord {
   importedAt: string;
 }
 
+export interface AccountImportsSummary {
+  account: Account;
+  importCount: number;
+  totalRows: number;
+  earliestStart: string | null;
+  latestEnd: string | null;
+  lastImport: ImportRecord | null;
+  imports: ImportRecord[];
+}
+
 export interface ProfileInfo {
   id: string;
   name: string;
   createdAt: string;
   /** Mode d’usage du profil (une app, trois cibles). */
   usageMode?: UsageMode;
+  /** Verrou irréversible (association / tpe uniquement). */
+  usageLocked?: boolean;
+  lockedAt?: string | null;
 }

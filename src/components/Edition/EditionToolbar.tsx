@@ -79,17 +79,17 @@ const EditionToolbar: React.FC<EditionToolbarProps> = ({
               <Redo2 size={14} />
             </button>
           </div>
-          <button type="button" className="edition-toolbar-btn" onClick={onAddRow}>
-            <Plus size={14} /> {t('edition.addRow')}
+          <button type="button" className="edition-toolbar-btn edition-toolbar-btn-icon" onClick={onAddRow} title={t('edition.addRow')} aria-label={t('edition.addRow')}>
+            <Plus size={14} />
           </button>
-          <button type="button" className="edition-toolbar-btn" onClick={onAutocat}>
-            <Sparkles size={14} /> {t('edition.autocat')}
+          <button type="button" className="edition-toolbar-btn edition-toolbar-btn-icon" onClick={onAutocat} title={t('edition.autocat')} aria-label={t('edition.autocat')}>
+            <Sparkles size={14} />
           </button>
-          <button type="button" className="edition-toolbar-btn" onClick={onRoutineLabel}>
-            <Bookmark size={14} /> {t('edition.routineLabelToolbar')}
+          <button type="button" className="edition-toolbar-btn edition-toolbar-btn-icon" onClick={onRoutineLabel} title={t('edition.routineLabelToolbar')} aria-label={t('edition.routineLabelToolbar')}>
+            <Bookmark size={14} />
           </button>
-          <button type="button" className="edition-toolbar-btn" onClick={onDuplicates}>
-            <Copy size={14} /> {t('edition.duplicates')}
+          <button type="button" className="edition-toolbar-btn edition-toolbar-btn-icon" onClick={onDuplicates} title={t('edition.duplicates')} aria-label={t('edition.duplicates')}>
+            <Copy size={14} />
           </button>
         </div>
         <input

@@ -24,6 +24,7 @@ export function defaultDashboardSettings(context: DashboardSettingsContext): Das
     (context.hasDonations || context.emetteurType === 'association');
   const contacts = context.contactsMenu;
   const legal = context.registerMenu || invoicing || association;
+  const amortissement = context.amortissementMenu && context.hasImmobilisations;
 
   return {
     donationsByDonorMode: 'cumulative',
@@ -35,6 +36,7 @@ export function defaultDashboardSettings(context: DashboardSettingsContext): Das
         invoiceVsPayment: invoicing,
         invoiceAging: invoicing,
         donationsByDonor: association,
+        amortissement,
       },
       summary: {
         treasuryKpis: true,
@@ -77,6 +79,7 @@ function mergeSettings(base: DashboardSettings, stored: unknown): DashboardSetti
         invoiceVsPayment: asBool(chartsIn.invoiceVsPayment, base.widgets.charts.invoiceVsPayment),
         invoiceAging: asBool(chartsIn.invoiceAging, base.widgets.charts.invoiceAging),
         donationsByDonor: asBool(chartsIn.donationsByDonor, base.widgets.charts.donationsByDonor),
+        amortissement: asBool(chartsIn.amortissement, base.widgets.charts.amortissement),
       },
       summary: {
         treasuryKpis: asBool(summaryIn.treasuryKpis, base.widgets.summary.treasuryKpis),
@@ -103,11 +106,12 @@ async function ensureTable(): Promise<void> {
 export const DashboardSettingsService = {
   defaults: defaultDashboardSettings,
 
-  async load(context: Omit<DashboardSettingsContext, 'hasInvoices' | 'hasDonations'>): Promise<DashboardSettings> {
+  async load(context: Omit<DashboardSettingsContext, 'hasInvoices' | 'hasDonations' | 'hasImmobilisations'>): Promise<DashboardSettings> {
     return withLog('DashboardSettingsService.load', async () => {
       await ensureTable();
       let hasInvoices = false;
       let hasDonations = false;
+      let hasImmobilisations = false;
       try {
         const invoiceRows = await Db.select<{ id: string }>('SELECT id FROM factures LIMIT 1');
         hasInvoices = invoiceRows.length > 0;
@@ -120,10 +124,17 @@ export const DashboardSettingsService = {
       } catch {
         hasDonations = false;
       }
+      try {
+        const immoRows = await Db.select<{ id: string }>('SELECT id FROM immobilisations LIMIT 1');
+        hasImmobilisations = immoRows.length > 0;
+      } catch {
+        hasImmobilisations = false;
+      }
       const defaults = defaultDashboardSettings({
         ...context,
         hasInvoices,
         hasDonations,
+        hasImmobilisations,
       });
       const rows = await Db.select<{ payload: string }>(
         'SELECT payload FROM dashboard_settings WHERE id = 1'

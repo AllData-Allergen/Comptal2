@@ -34,7 +34,7 @@ flowchart LR
 | Prévisionnel | Réalisé | `pages/Previsionnel`, `ForecastModel` |
 | Contacts et groupements | Réalisé | `pages/Client`, `ClientService` |
 | Devis, factures, postes et paiements | Réalisé | `pages/Facturation`, `InvoiceService` |
-| Association, dons et reçus | Réalisé | `pages/Association`, `DonationService` |
+| Dons et reçus (ex-page Association redistribuée) | Réalisé | `#/dons`, Organisation, Contacts, Registre ; `DonationService` |
 | Registre documentaire | Réalisé | `pages/Register`, `RegisterService` |
 | Organisation, mentions et modèles PDF | Réalisé | `OrganizationTab`, services PDF |
 

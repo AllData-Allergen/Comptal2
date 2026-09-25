@@ -133,22 +133,33 @@
 
 ## Schéma d'appel par onglet
 
+Le filtre commun est appliqué avant la sélection de l'onglet. Chaque branche possède ensuite sa
+propre sortie afin d'éviter une convergence illisible vers un seul bloc.
+
 ```mermaid
-flowchart TD
+flowchart LR
     F[FinanceGlobal] --> FILTER[FinanceToolbar / StatsFilters]
     FILTER --> M{Onglet}
-    M -->|Mensuel| CAT[categoryByPeriod]
-    M -->|Solde| BAL[balancesOverPeriod]
+    M -->|Mensuel| CAT[StatsService.categoryByPeriod]
+    CAT --> OUT1[Graphique mensuel + tableau]
+
+    M -->|Solde| BAL[StatsService.balancesOverPeriod]
+    BAL --> OUT2[Graphique des soldes + tableau]
+
+    M -->|Bilan| B[StatsService.bilanByPeriod]
+    B --> OUT3[Graphiques du bilan + tableau]
+
     M -->|Projection| P[ProjectionVsReality]
-    P --> PS[ProjectService]
-    P --> CALC[ProjectionService.calculateByCategory]
-    P --> REAL[StatsService.categoryByPeriod]
-    M -->|Bilan| B[bilanByPeriod]
-    CAT --> FT[Graphique + FinanceTable]
-    BAL --> FT
-    CALC --> FT
-    REAL --> FT
-    B --> FT
+```
+
+Le calcul de l'onglet Projection combine deux sources alignées sur les mêmes périodes :
+
+```mermaid
+flowchart LR
+    PROJECT[ProjectService] --> CALC[ProjectionService.calculateByCategory]
+    REALITY[StatsService.categoryByPeriod] --> COMPARE[Comparaison prévu / réel]
+    CALC --> COMPARE
+    COMPARE --> OUT[Graphique sélectionné + tableau]
 ```
 
 ---

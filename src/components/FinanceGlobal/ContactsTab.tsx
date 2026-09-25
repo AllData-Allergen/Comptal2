@@ -13,6 +13,7 @@ import {
 } from '../../utils/chartPastel';
 import '../../utils/registerCharts';
 import FinanceInsightKpis from './FinanceInsightKpis';
+import FinanceExcelExportButton from './FinanceExcelExportButton';
 
 interface ContactsTabProps {
   data: ContactInsights;
@@ -127,6 +128,19 @@ const ContactsTab: React.FC<ContactsTabProps> = ({ data }) => {
 
   return (
     <div className="finance-insight-tab">
+      <FinanceExcelExportButton
+        fileName="finance_contacts"
+        sheetName={t('financeGlobal.contactsTab')}
+        headers={[t('financeGlobal.category'), t('financeGlobal.total')]}
+        rows={[
+          [t('financeGlobal.clientsOnly'), clientsOnly],
+          [t('financeGlobal.donorsOnly'), donorsOnly],
+          [t('financeGlobal.bothRoles'), data.both],
+          [t('dashboard.contacts.incomplete'), data.incomplete],
+          [t('dashboard.contacts.missingSiren'), data.missingSiren],
+          [t('dashboard.contacts.total'), data.total],
+        ]}
+      />
       <FinanceInsightKpis
         items={[
           { id: 'total', label: t('dashboard.contacts.total'), value: String(data.total) },

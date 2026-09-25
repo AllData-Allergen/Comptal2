@@ -93,9 +93,6 @@ Dashboard, Finance et Prévisionnel.
 
 ## Mises à jour
 
-`UpdateService.checkForUpdate()` interroge le plugin updater vers
-`https://github.com/LeopaulV/Comptal2/releases/latest/download/latest.json`.
+`UpdateService.checkForUpdate()` interroge le plugin updater.
 `downloadInstallAndRelaunch()` télécharge, installe, remonte la progression puis demande la relance
-via `tauri-plugin-process`. En production, `UpdateNotifier` lance cette vérification au démarrage.
-L’installeur NSIS remplace le programme sous `%LOCALAPPDATA%\Comptal2.1` ; les profils restent dans
-`%APPDATA%\com.leopaul.comptal21\data`.
+via `tauri-plugin-process`. Cette chaîne est distincte d’un build local.

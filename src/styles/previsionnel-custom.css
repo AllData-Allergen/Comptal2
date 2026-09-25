@@ -80,6 +80,52 @@ html.dark .previsionnel-toolbar {
   gap: 6px;
 }
 
+.previsionnel-line-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.previsionnel-line-menu-list {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  z-index: 40;
+  min-width: 200px;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--invoicing-gray-300);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md, 0 8px 24px rgba(15, 23, 42, 0.16));
+}
+
+.dark .previsionnel-line-menu-list,
+html.dark .previsionnel-line-menu-list {
+  background: var(--invoicing-gray-100);
+}
+
+.previsionnel-line-menu-list button {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--invoicing-gray-800);
+  cursor: pointer;
+}
+
+.previsionnel-line-menu-list button:hover {
+  background: var(--invoicing-gray-100);
+}
+
+.dark .previsionnel-line-menu-list button:hover,
+html.dark .previsionnel-line-menu-list button:hover {
+  background: var(--invoicing-gray-200);
+}
+
 .previsionnel-split {
   flex: 1;
   min-height: 0;
@@ -365,6 +411,21 @@ html.dark .forecast-grid tbody tr.group td.editing {
   cursor: default;
 }
 
+/* Colonne Groupe sur ligne Groupe : grisé + barré (non éditable / dérivé). */
+.forecast-grid td.group-locked {
+  color: var(--invoicing-gray-400);
+  text-decoration: line-through;
+  font-style: italic;
+  font-weight: 400;
+  cursor: default;
+  user-select: none;
+}
+
+.dark .forecast-grid td.group-locked,
+html.dark .forecast-grid td.group-locked {
+  color: var(--invoicing-gray-500);
+}
+
 .forecast-editor {
   display: block;
   width: 100%;
@@ -626,6 +687,11 @@ html.dark .previsionnel-tx-item {
   border-radius: 10px;
   background: var(--invoicing-gray-50);
   box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  contain: layout paint;
 }
 
 .dark .previsionnel-widget,
@@ -641,11 +707,27 @@ html.dark .previsionnel-widget {
   border-bottom: 1px solid var(--invoicing-gray-200);
 }
 
+.previsionnel-widget-header-text {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .previsionnel-widget-header h3 {
   margin: 0;
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--invoicing-gray-800);
+}
+
+.previsionnel-widget-desc {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--invoicing-gray-500);
 }
 
 .previsionnel-widget-actions {
@@ -670,11 +752,47 @@ html.dark .previsionnel-widget {
 
 .previsionnel-widget-body {
   padding: 10px 12px 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 
+/*
+ * Cadre Chart.js : hauteur fixe + confinement.
+ * Les classes .chart-x-scroll du Dashboard imposent min-height: 280px —
+ * ici on les annule pour éviter la superposition des canvas entre widgets.
+ */
 .previsionnel-chart-h {
   height: 220px;
+  max-height: 220px;
   position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.previsionnel-chart-h.is-auto {
+  height: auto;
+  max-height: none;
+  min-height: 180px;
+}
+
+.previsionnel-chart-h .chart-x-scroll,
+.previsionnel-chart-h .chart-x-scroll-inner {
+  min-height: 0 !important;
+  height: 100%;
+  flex: 1;
+  max-height: 100%;
+}
+
+.previsionnel-chart-h .chart-x-scroll-inner > div,
+.previsionnel-chart-h > div:not(.chart-x-scroll) {
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100%;
+  position: relative !important;
+  min-height: 0;
 }
 
 .previsionnel-stats-grid {
@@ -742,8 +860,27 @@ html.dark .previsionnel-stat-card {
 
 .previsionnel-widget-list label {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  min-width: 0;
+}
+
+.previsionnel-widget-list-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.previsionnel-widget-list-meta strong {
+  font-weight: 600;
+  color: var(--invoicing-gray-800);
+}
+
+.previsionnel-widget-list-meta span {
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: var(--invoicing-gray-500);
 }
 
 .previsionnel-reorder {

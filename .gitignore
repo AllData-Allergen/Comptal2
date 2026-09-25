@@ -18,5 +18,6 @@ data/plugins/*
 src-tauri/keys/
 
 # Divers
+_updater_work/
 *.local
 .DS_Store

@@ -47,6 +47,8 @@ export const tauriBridge = {
   deleteDir: (rel: string): Promise<void> => cmd('delete_dir', { rel }),
   copyDir: (srcRel: string, dstRel: string): Promise<void> =>
     cmd('copy_dir', { srcRel, dstRel }),
+  renameDir: (srcRel: string, dstRel: string): Promise<void> =>
+    cmd('rename_dir', { srcRel, dstRel }),
 
   writeBinaryFile: (rel: string, data: number[]): Promise<void> =>
     cmd('write_binary_file', { rel, data }),
@@ -61,8 +63,15 @@ export const tauriBridge = {
     cmd('read_external_text_file', { abs }),
   writeExternalTextFile: (abs: string, content: string): Promise<void> =>
     cmd('write_external_text_file', { abs, content }),
+  writeExternalBinaryFile: (abs: string, data: number[]): Promise<void> =>
+    cmd('write_external_binary_file', { abs, data }),
   readExternalDir: (abs: string): Promise<FsEntry[]> => cmd('read_external_dir', { abs }),
   externalExists: (abs: string): Promise<boolean> => cmd('external_exists', { abs }),
 
   openPath: (abs: string): Promise<void> => cmd('open_path', { abs }),
+
+  sealProfileMode: (args: { profileId: string; usageMode: string; usageLocked: boolean }): Promise<string> =>
+    cmd('seal_profile_mode', { profileId: args.profileId, usageMode: args.usageMode, usageLocked: args.usageLocked }),
+  verifyProfileMode: (args: { profileId: string; usageMode: string; usageLocked: boolean; seal: string }): Promise<boolean> =>
+    cmd('verify_profile_mode', { profileId: args.profileId, usageMode: args.usageMode, usageLocked: args.usageLocked, seal: args.seal }),
 };

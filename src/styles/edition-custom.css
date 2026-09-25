@@ -25,7 +25,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 10px 12px 14px;
   background: var(--invoicing-gray-50);
   border: 1px solid var(--invoicing-gray-200);
   border-radius: 10px;
@@ -161,8 +161,31 @@ html.dark .edition-toolbar-btn:disabled:hover {
   gap: 6px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 2px 0;
+  padding: 2px 0 8px;
   scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
+
+.edition-filter-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px dashed var(--invoicing-gray-400);
+  background: var(--invoicing-gray-50);
+  color: var(--invoicing-gray-700);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.edition-filter-select-all:hover {
+  border-color: var(--invoicing-primary);
+  color: var(--invoicing-primary);
 }
 
 .edition-filter-chip {
@@ -834,12 +857,43 @@ html.dark .edition-category-collapsed-icon {
 .edition-context-menu {
   position: fixed;
   z-index: 1000;
-  min-width: 160px;
+  min-width: 180px;
   padding: 4px 0;
   background: #fff;
   border: 1px solid var(--invoicing-gray-200);
   border-radius: 8px;
   box-shadow: var(--shadow-lg);
+}
+
+.edition-context-menu-count {
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--invoicing-primary);
+  border-bottom: 1px solid var(--invoicing-gray-200);
+  margin-bottom: 4px;
+}
+
+.edition-context-menu-cats {
+  max-height: 200px;
+  overflow-y: auto;
+  border-top: 1px solid var(--invoicing-gray-200);
+  border-bottom: 1px solid var(--invoicing-gray-200);
+  margin: 2px 0;
+}
+
+.edition-context-menu-danger {
+  color: var(--invoicing-danger, #dc2626) !important;
+}
+
+.edition-row-selected td {
+  box-shadow: inset 0 0 0 1px var(--invoicing-primary);
+}
+
+.edition-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
 }
 
 .routine-label-hint {
@@ -882,7 +936,9 @@ html.dark .edition-category-collapsed-icon {
 }
 
 .edition-context-menu button {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   padding: 8px 14px;
   text-align: left;
@@ -925,6 +981,7 @@ html.dark .edition-category-collapsed-icon {
 
 .edition-autocat-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 12px;
 }
@@ -1076,6 +1133,22 @@ html.dark .edition-context-menu {
   border-color: var(--invoicing-gray-400);
 }
 
+.dark .edition-context-menu-count,
+html.dark .edition-context-menu-count {
+  border-bottom-color: var(--invoicing-gray-400);
+}
+
+.dark .edition-context-menu-cats,
+html.dark .edition-context-menu-cats {
+  border-top-color: var(--invoicing-gray-400);
+  border-bottom-color: var(--invoicing-gray-400);
+}
+
+.dark .edition-row-selected td,
+html.dark .edition-row-selected td {
+  box-shadow: inset 0 0 0 1px var(--invoicing-primary-lighter);
+}
+
 .dark .edition-cat-suggestions,
 html.dark .edition-cat-suggestions {
   background: var(--invoicing-gray-200);
@@ -1137,7 +1210,7 @@ html.dark .edition-cat-suggestions {
   border: 1px solid var(--invoicing-gray-300);
   border-radius: 6px;
   font-size: 0.8rem;
-  background: #fff;
+  background: var(--invoicing-input-bg);
   color: var(--invoicing-gray-900);
 }
 
@@ -1218,9 +1291,9 @@ html.dark .edition-excel-filter-panel {
 
 .dark .edition-excel-filter-search,
 html.dark .edition-excel-filter-search {
-  background: var(--invoicing-gray-800);
+  background: var(--invoicing-input-bg);
   border-color: var(--invoicing-gray-500);
-  color: var(--invoicing-gray-900);
+  color: var(--invoicing-gray-800);
 }
 
 .dark .edition-excel-filter-apply,

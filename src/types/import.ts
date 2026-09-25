@@ -8,6 +8,8 @@ export type ColumnRole =
   | 'credit'
   | 'debitCredit'
   | 'balance'
+  | 'category'
+  | 'account'
   | 'ignore';
 
 export interface ColumnInfo {
@@ -54,6 +56,8 @@ export interface ColumnMappingConfig {
   libelleColumnIndex: number;
   debitColumnIndex: number;
   creditColumnIndex: number;
+  categoryColumnIndex?: number;
+  accountColumnIndex?: number;
 }
 
 export interface PreviewRow {
@@ -62,6 +66,16 @@ export interface PreviewRow {
   debit: number;
   credit: number;
   label: string;
+  /** Valeur brute de la colonne catégorie du fichier (avant résolution). */
+  categoryRaw?: string | null;
+  /** Code catégorie résolu pour l'INSERT. */
+  categoryCode?: string | null;
+  /** Valeur brute de la colonne compte du fichier (avant résolution). */
+  accountRaw?: string | null;
+  /** Id compte résolu pour l'INSERT (sinon compte wizard). */
+  accountId?: number | null;
+  /** Code compte résolu (aperçu). */
+  accountCode?: string | null;
 }
 
 export interface ExcelSheetInfo {
@@ -108,6 +122,8 @@ export function mappingFromRoles(
   let libelleColumnIndex: number | undefined;
   let debitColumnIndex: number | undefined;
   let creditColumnIndex: number | undefined;
+  let categoryColumnIndex: number | undefined;
+  let accountColumnIndex: number | undefined;
 
   for (const [index, role] of roles.entries()) {
     switch (role) {
@@ -130,6 +146,12 @@ export function mappingFromRoles(
         debitColumnIndex = index;
         creditColumnIndex = index;
         break;
+      case 'category':
+        categoryColumnIndex = index;
+        break;
+      case 'account':
+        accountColumnIndex = index;
+        break;
       default:
         break;
     }
@@ -149,5 +171,7 @@ export function mappingFromRoles(
     libelleColumnIndex,
     debitColumnIndex: debitColumnIndex ?? creditColumnIndex!,
     creditColumnIndex: creditColumnIndex ?? debitColumnIndex!,
+    categoryColumnIndex,
+    accountColumnIndex,
   };
 }

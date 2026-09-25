@@ -27,6 +27,8 @@ interface ForecastGridProps {
   columnWidths: Partial<Record<ForecastColumnId, number>>;
   categories: Category[];
   selectedRowId: number | null;
+  /** Incrémenté pour annuler l’édition en cours sans commit (ex. avant delete). */
+  discardEditNonce?: number;
   onSelectRow: (id: number | null, rowIndex: number) => void;
   onPatch: (rowIndex: number, patch: ForecastCellPatch) => void;
   onColumnsChange: (columns: ForecastColumnId[]) => void;
@@ -54,6 +56,20 @@ function parentForRow(row: ForecastGridRow | undefined): number | null {
   return row.isGroup ? row.id : row.parentId;
 }
 
+/** Colonnes dérivées des enfants (non éditables sur une ligne Groupe). */
+const GROUP_DERIVED_COLS: ReadonlySet<ForecastColumnId> = new Set([
+  'type',
+  'amount',
+  'periodicity',
+  'startDate',
+  'endDate',
+]);
+
+function isGroupLockedCell(row: ForecastGridRow, col: ForecastColumnId): boolean {
+  if (!row.isGroup) return false;
+  return col === 'group' || GROUP_DERIVED_COLS.has(col);
+}
+
 function colWidth(
   col: ForecastColumnId,
   widths: Partial<Record<ForecastColumnId, number>>
@@ -67,6 +83,7 @@ const ForecastGrid: React.FC<ForecastGridProps> = ({
   columnWidths,
   categories,
   selectedRowId,
+  discardEditNonce = 0,
   onSelectRow,
   onPatch,
   onColumnsChange,
@@ -90,6 +107,13 @@ const ForecastGrid: React.FC<ForecastGridProps> = ({
   const skipBlur = useRef(false);
   const widthsRef = useRef(columnWidths);
   widthsRef.current = columnWidths;
+
+  useEffect(() => {
+    if (discardEditNonce === 0) return;
+    skipBlur.current = true;
+    setEdit(null);
+    skipBlur.current = false;
+  }, [discardEditNonce]);
 
   const hiddenColumns = useMemo(
     () => FORECAST_COLUMN_CATALOG.filter((c) => !columns.includes(c)),
@@ -159,7 +183,7 @@ const ForecastGrid: React.FC<ForecastGridProps> = ({
 
   const startEdit = useCallback(
     (rowIndex: number, col: ForecastColumnId, row: ForecastGridRow) => {
-      if (col === 'amount' && row.isGroup) return;
+      if (isGroupLockedCell(row, col)) return;
       let draft = '';
       switch (col) {
         case 'name':
@@ -335,6 +359,9 @@ const ForecastGrid: React.FC<ForecastGridProps> = ({
       case 'amount':
         return row.isGroup || row.amount ? formatMoney(row.amount) : '';
       case 'periodicity':
+        if (row.isGroup && row.periodicityMixed) {
+          return t('previsionnel.periodicity.various');
+        }
         return t(`previsionnel.periodicity.${row.periodicity}`);
       case 'startDate':
         return row.startDate ? formatFrDate(row.startDate) : '';
@@ -552,12 +579,21 @@ const ForecastGrid: React.FC<ForecastGridProps> = ({
                   {columns.map((col, colIndex) => {
                     const isEdit = editing?.row === rowIndex && editing.col === col;
                     const isFocus = focused?.row === rowIndex && focused.col === colIndex;
+                    const locked = isGroupLockedCell(row, col);
                     const colorBg = col === 'color' ? row.color : undefined;
+                    const cellClass = [
+                      isFocus ? 'focused' : '',
+                      isEdit ? 'editing' : '',
+                      locked ? 'readonly' : '',
+                      row.isGroup && col === 'group' ? 'group-locked' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ');
                     return (
                       <td
                         key={col}
                         tabIndex={0}
-                        className={`${isFocus ? ' focused' : ''}${isEdit ? ' editing' : ''}${col === 'amount' && row.isGroup ? ' readonly' : ''}`}
+                        className={cellClass}
                         style={
                           col === 'color'
                             ? { background: `${colorBg}33` }
@@ -600,28 +636,6 @@ const ForecastGrid: React.FC<ForecastGridProps> = ({
             <button
               type="button"
               onClick={() => {
-                onAddLine(parentForRow(rows[contextMenu.rowIndex]));
-                setContextMenu(null);
-              }}
-            >
-              {t('previsionnel.newLine')}
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              onClick={() => {
-                onAddGroup(parentForRow(rows[contextMenu.rowIndex]));
-                setContextMenu(null);
-              }}
-            >
-              {t('previsionnel.newGroup')}
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              onClick={() => {
                 onFromCategory(parentForRow(rows[contextMenu.rowIndex]));
                 setContextMenu(null);
               }}
@@ -638,6 +652,28 @@ const ForecastGrid: React.FC<ForecastGridProps> = ({
               }}
             >
               {t('previsionnel.fromTransaction.action')}
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={() => {
+                onAddLine(parentForRow(rows[contextMenu.rowIndex]));
+                setContextMenu(null);
+              }}
+            >
+              {t('previsionnel.neutralLine')}
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={() => {
+                onAddGroup(parentForRow(rows[contextMenu.rowIndex]));
+                setContextMenu(null);
+              }}
+            >
+              {t('previsionnel.newGroup')}
             </button>
           </li>
         </ul>

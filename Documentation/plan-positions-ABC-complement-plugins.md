@@ -84,7 +84,7 @@ Une seule application, **trois modes d’usage** (réglage par profil) : Familia
 - About / disclaimer / modes d’usage
 - `PaymentTrackingService` + `PaiementFactureModal` (écriture auto)
 - `AssociationPDFService` (RGPD + conservation)
-- `pages/Association/Association.tsx` (disclaimer ANC)
+- `pages/Association/Association.tsx` — page **Dons** (`#/dons`), disclaimer ANC
 - Confirmations Data / Profils / Comptes / Édition / Registre
 - Soft-delete `transactions.deleted_at`
 
@@ -181,7 +181,7 @@ Une seule application, **trois modes d’usage** (réglage par profil) : Familia
 - Contrat de colonnes pour mods `export_mapper` (Documentation)
 - Bouton Dashboard + onglet Données
 
-### W5 — Association — **P0 allégé**
+### W5 — Dons (domaine associatif) — **P0 allégé**
 
 - Devis caduc / reçus annulés : déjà en place — conserver + mention conservation
 - Disclaimer ANC 2018-06 / CAC sur la page Dons
@@ -236,7 +236,7 @@ Une seule application, **trois modes d’usage** (réglage par profil) : Familia
 5. PDF facture : identité figée, client + SIREN, TVA par taux, mentions légales.
 6. Paiement espèces/chèque : une ligne apparaît dans Édition (crédit), ce n’est pas une caisse.
 7. Export « expert-comptable » : CSV à remettre au cabinet — pas un FEC.
-8. Association : bandeau « ne remplace pas les comptes ANC 2018-06 » ; reçus conservés si annulés.
+8. Dons : bandeau « ne remplace pas les comptes ANC 2018-06 » ; reçus conservés si annulés.
 9. Paramètre → Plugins : importer un ZIP de mod, activer, appliquer un pack de catégories / mentions / mapping.
 
 ---

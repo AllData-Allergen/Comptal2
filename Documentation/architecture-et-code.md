@@ -2,22 +2,27 @@
 
 ## 1. Architecture d’exécution
 
-```mermaid
-flowchart TB
-    OS[Système de fichiers local]
-    RUST[Tauri 2 / Rust]
-    IPC[Commandes IPC autorisées]
-    SQL[Plugin SQL<br/>pool SQLite mono-connexion]
-    TS[Services TypeScript]
-    REACT[Pages et composants React]
-    DB[(comptal.db du profil actif)]
-    JSON[settings.json / info.json / logs JSONL]
+Deux chemins partent des services TypeScript : les requêtes SQLite et les opérations système. Ils
+sont séparés ci-dessous pour garder un sens de lecture unique et éviter les liaisons diagonales.
 
-    REACT --> TS
-    TS --> SQL --> DB
-    TS --> IPC --> RUST --> OS
-    RUST --> JSON
-    RUST --> DB
+### Données métier SQLite
+
+```mermaid
+flowchart LR
+    REACT[Pages et composants React] --> TS[Services TypeScript]
+    TS --> SQL[Plugin SQL · connexion unique]
+    SQL --> DB[(comptal.db du profil actif)]
+```
+
+### Fichiers et commandes système
+
+```mermaid
+flowchart LR
+    REACT[Pages et composants React] --> TS[Services TypeScript]
+    TS --> IPC[Commandes IPC autorisées]
+    IPC --> RUST[Tauri 2 / Rust]
+    RUST --> FS[Système de fichiers local]
+    FS --> JSON[settings.json / info.json / logs JSONL]
 ```
 
 L’application ne possède ni serveur HTTP métier, ni base distante. Vite ne sert que le renderer en
@@ -43,7 +48,7 @@ sequenceDiagram
     Settings-->>Main: thème, langue, fenêtre, profil
     Main->>Profile: ensureInitialized()
     Profile->>Db: openForProfile(profileId)
-    Db->>Db: PRAGMA + ensureSchema() + user_version=14
+    Db->>Db: PRAGMA + ensureSchema() + user_version=15
     Profile-->>Main: profil actif
     Main->>UI: render(<App />)
 ```
@@ -69,7 +74,7 @@ directement. Prévisionnel, Contacts, Facturation, Dons et Registre utilisent `R
 | `#/previsionnel` | Prévisionnel | `#/project-management` |
 | `#/clients` | Contacts | `#/contacts` |
 | `#/facturation` | Facturation | `#/invoicing` |
-| `#/dons` | Dons (Association) | `#/association` |
+| `#/dons` | Dons | `#/association` (redirige) |
 | `#/registre` | Registre | |
 | `#/parametre` | Paramètres | |
 
@@ -187,16 +192,20 @@ est calculé à partir de ses descendants.
 `calculateTotals()` agrège HT, TVA par taux et TTC. Les dates sont sérialisées en ISO dans les
 payloads JSON, puis réhydratées en objets `Date`.
 
-### Association
+### Dons (domaine associatif)
+
+L’ancienne page Association est redistribuée : config dans Paramètres → Organisation, donateurs
+dans Contacts, journal/reçus sur `#/dons`, états figés dans Registre.
 
 | Service | Fonctions principales | Tables |
 |---|---|---|
-| `AssociationConfigService` | charger, créer et enregistrer la configuration | `association_config` |
-| `DonateurService` | CRUD donateurs, association catégorie/transactions | `donateurs`, `donateur_transactions` |
-| `DonsService` | CRUD dons manuels | `dons_manuels` |
+| `DonationService` | journal, rapprochement, règles, synthèse | `donations`, `donation_rules` |
+| `AssociationConfigService` | identité / signataire / compteur (Organisation) | `association_config` |
+| `DonateurService` | legacy migration (donateurs historiques) | `donateurs`, `donateur_transactions` |
+| `DonsService` | legacy dons manuels | `dons_manuels` |
 | `RegistreRecusService` | numérotation, ajout et annulation | `registre_recus` |
-| `AssociationPDFService` | génération de reçu fiscal | configuration, donateur et don |
-| `PosteAssociationService` | catalogue associatif isolé par `kind` | tables de postes |
+| `AssociationPDFService` | génération de reçu fiscal | configuration, contact donateur et don |
+| `PosteAssociationService` | catalogue isolé par `kind` | tables de postes |
 
 ### Registre documentaire
 

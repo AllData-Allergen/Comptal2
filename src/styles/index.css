@@ -21,6 +21,18 @@ body {
   color: var(--invoicing-gray-900);
 }
 
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role='button']:focus-visible,
+[tabindex]:not([tabindex='-1']):focus-visible {
+  outline: 2px solid var(--invoicing-primary-light);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--invoicing-focus-ring);
+}
+
 #root {
   width: 100%;
   height: 100vh;
@@ -185,7 +197,7 @@ html.dark .ct-btn-secondary {
   border: 1px solid var(--invoicing-gray-300);
   border-radius: 8px;
   font-size: 0.9rem;
-  background-color: #ffffff;
+  background-color: var(--invoicing-input-bg);
   color: var(--invoicing-gray-900);
   transition: all 0.2s ease;
 }
@@ -256,6 +268,75 @@ html.dark .ct-select {
   font-size: 0.85rem;
   color: var(--invoicing-gray-500);
   margin-bottom: 16px;
+}
+
+.category-agg-toggle {
+  display: inline-flex;
+  border: 1px solid var(--invoicing-gray-300);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--invoicing-surface);
+  flex-shrink: 0;
+}
+
+.category-agg-toggle-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--invoicing-gray-600);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.category-agg-toggle-btn + .category-agg-toggle-btn {
+  border-left: 1px solid var(--invoicing-gray-300);
+}
+
+.category-agg-toggle-btn:hover {
+  background: var(--invoicing-gray-100);
+  color: var(--invoicing-gray-900);
+}
+
+.category-agg-toggle-btn.is-active {
+  background: var(--invoicing-primary);
+  color: #fff;
+}
+
+.category-agg-toggle-btn.is-active:hover {
+  background: var(--invoicing-primary);
+  color: #fff;
+}
+
+.dark .category-agg-toggle,
+html.dark .category-agg-toggle {
+  border-color: var(--invoicing-gray-400);
+  background: var(--invoicing-surface);
+}
+
+.dark .category-agg-toggle-btn,
+html.dark .category-agg-toggle-btn {
+  color: var(--invoicing-gray-700);
+}
+
+.dark .category-agg-toggle-btn + .category-agg-toggle-btn,
+html.dark .category-agg-toggle-btn + .category-agg-toggle-btn {
+  border-left-color: var(--invoicing-gray-600);
+}
+
+.dark .category-agg-toggle-btn:hover,
+html.dark .category-agg-toggle-btn:hover {
+  background: var(--invoicing-gray-300);
+  color: var(--invoicing-gray-900);
+}
+
+.dark .category-agg-toggle-btn.is-active,
+html.dark .category-agg-toggle-btn.is-active {
+  background: var(--invoicing-primary);
+  color: #fff;
 }
 
 /* Scrollbar personnalisé */

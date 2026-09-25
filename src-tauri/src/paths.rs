@@ -74,7 +74,10 @@ pub fn resolve(app: &AppHandle, rel: &str) -> Result<PathBuf, String> {
     }
     for comp in rel_path.components() {
         match comp {
-            Component::ParentDir | Component::RootDir | Component::Prefix(_) | Component::CurDir => {
+            Component::ParentDir
+            | Component::RootDir
+            | Component::Prefix(_)
+            | Component::CurDir => {
                 return Err(format!("Chemin relatif refusé: {rel}"));
             }
             _ => {}

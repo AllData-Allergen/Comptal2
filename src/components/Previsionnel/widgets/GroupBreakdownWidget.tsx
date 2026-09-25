@@ -6,6 +6,7 @@ import { BreakdownDetail, BreakdownSlice } from '../../../types/forecast';
 import { formatMoney } from '../../../utils/amounts';
 import { useTheme } from '../../../hooks/useTheme';
 import { chartAxisColor, chartPastel, chartSurfaceColor, chartTooltipTheme } from '../../../utils/chartPastel';
+import PrevisionnelChartFrame from '../PrevisionnelChartFrame';
 import '../../../utils/registerCharts';
 
 interface GroupBreakdownWidgetProps {
@@ -13,6 +14,7 @@ interface GroupBreakdownWidgetProps {
   details?: Record<string, BreakdownDetail[]>;
 }
 
+/** Anneau : répartition par groupe du tableau (lignes hors groupe regroupées). */
 const GroupBreakdownWidget: React.FC<GroupBreakdownWidgetProps> = ({ slices, details }) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -62,17 +64,18 @@ const GroupBreakdownWidget: React.FC<GroupBreakdownWidgetProps> = ({ slices, det
       labels,
       datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }],
     };
-  }, [display, surface, total, isDark]);
+  }, [display, surface, total]);
 
   const options: ChartOptions<'doughnut'> = useMemo(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
       cutout: '58%',
+      layout: { padding: 4 },
       plugins: {
         legend: {
           position: 'right',
-          labels: { color: axis, boxWidth: 12, filter: (item) => Boolean(item.text) },
+          labels: { color: axis, boxWidth: 12, font: { size: 11 }, filter: (item) => Boolean(item.text) },
         },
         tooltip: {
           ...tooltip,
@@ -104,9 +107,9 @@ const GroupBreakdownWidget: React.FC<GroupBreakdownWidgetProps> = ({ slices, det
   if (display.length === 0) return <p className="previsionnel-empty-chart">—</p>;
 
   return (
-    <div className="previsionnel-chart-h">
+    <PrevisionnelChartFrame>
       <Doughnut data={data} options={options} />
-    </div>
+    </PrevisionnelChartFrame>
   );
 };
 

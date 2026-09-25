@@ -39,6 +39,8 @@ const ROLE_COLORS: Record<ColumnRole, string> = {
   credit: '#10b981',
   debitCredit: '#a855f7',
   balance: '#64748b',
+  category: '#f59e0b',
+  account: '#0ea5e9',
   ignore: '#94a3b8',
 };
 
@@ -263,6 +265,8 @@ const ColumnMappingInterface: React.FC<ColumnMappingInterfaceProps> = ({
                     <option value="debitCredit">{t('columnMapping.debitCredit')}</option>
                   </optgroup>
                   <option value="balance">{t('columnMapping.balance')}</option>
+                  <option value="category">{t('columnMapping.category')}</option>
+                  <option value="account">{t('columnMapping.account')}</option>
                 </select>
                 {role !== 'ignore' && (
                   <CheckCircle size={20} style={{ color: ROLE_COLORS[role] }} className="shrink-0" />

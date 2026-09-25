@@ -17,8 +17,10 @@ import {
 import { Account, Category } from '../../types/models';
 import { AccountBalance, CategoryTotal, KpiStats } from '../../services/StatsService';
 import { DashboardInsights, DashboardSummaryWidgets } from '../../types/dashboard';
+import { CategoryAggregation } from '../../utils/categoryAggregate';
 import { formatMoney } from '../../utils/amounts';
 import { formatFrDate } from '../../utils/dateFormats';
+import CategoryAggToggle from '../Common/CategoryAggToggle';
 import MiniAccountCards from './MiniAccountCards';
 import MiniCategoryCards from './MiniCategoryCards';
 import TopCategoriesList from './TopCategoriesList';
@@ -35,6 +37,8 @@ interface DashboardSummaryPanelProps {
   dateEnd: string;
   insights: DashboardInsights;
   summary: DashboardSummaryWidgets;
+  categoryAggregation: CategoryAggregation;
+  onCategoryAggregationChange: (value: CategoryAggregation) => void;
 }
 
 const DashboardSummaryPanel: React.FC<DashboardSummaryPanelProps> = ({
@@ -48,6 +52,8 @@ const DashboardSummaryPanel: React.FC<DashboardSummaryPanelProps> = ({
   dateEnd,
   insights,
   summary,
+  categoryAggregation,
+  onCategoryAggregationChange,
 }) => {
   const { t } = useTranslation();
   const from = formatFrDate(dateStart);
@@ -331,7 +337,19 @@ const DashboardSummaryPanel: React.FC<DashboardSummaryPanelProps> = ({
       {summary.miniCards && (
         <>
           <section className="dashboard-mini-section">
-            <p className="dashboard-mini-section-title">{t('dashboard.categoryAverages')}</p>
+            <div className="dashboard-mini-section-header">
+              <p className="dashboard-mini-section-title">
+                {t(
+                  categoryAggregation === 'group'
+                    ? 'dashboard.groupAverages'
+                    : 'dashboard.categoryAverages'
+                )}
+              </p>
+              <CategoryAggToggle
+                value={categoryAggregation}
+                onChange={onCategoryAggregationChange}
+              />
+            </div>
             <MiniCategoryCards
               totals={catTotals}
               categories={categories}
@@ -356,7 +374,21 @@ const DashboardSummaryPanel: React.FC<DashboardSummaryPanelProps> = ({
 
       {summary.topCategories && (
         <section className="dashboard-mini-section">
-          <p className="dashboard-mini-section-title">{t('dashboard.summary.topExpenses')}</p>
+          <div className="dashboard-mini-section-header">
+            <p className="dashboard-mini-section-title">
+              {t(
+                categoryAggregation === 'group'
+                  ? 'dashboard.summary.topExpensesByGroup'
+                  : 'dashboard.summary.topExpenses'
+              )}
+            </p>
+            {!summary.miniCards && (
+              <CategoryAggToggle
+                value={categoryAggregation}
+                onChange={onCategoryAggregationChange}
+              />
+            )}
+          </div>
           <TopCategoriesList
             totals={catTotals}
             categories={categories}

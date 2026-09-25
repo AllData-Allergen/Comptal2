@@ -5,15 +5,19 @@ import { Chart as ChartJS, ChartOptions } from 'chart.js';
 import { formatMoney } from '../../utils/amounts';
 import { useTheme } from '../../hooks/useTheme';
 import { DonorSeries } from '../../types/dashboard';
+import { ChartGranularity } from '../../types/projection';
 import { dashboardChartTheme, dashboardTooltipOptions } from '../../utils/dashboardChartTheme';
+import { periodXTicks } from '../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../Common/ScrollablePeriodChart';
 import '../../utils/registerCharts';
 
 interface DonationsByDonorChartProps {
   labels: string[];
   donors: DonorSeries[];
+  granularity: ChartGranularity;
 }
 
-const DonationsByDonorChart: React.FC<DonationsByDonorChartProps> = ({ labels, donors }) => {
+const DonationsByDonorChart: React.FC<DonationsByDonorChartProps> = ({ labels, donors, granularity }) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const isDarkMode = theme === 'dark';
@@ -60,7 +64,7 @@ const DonationsByDonorChart: React.FC<DonationsByDonorChartProps> = ({ labels, d
       scales: {
         x: {
           stacked: true,
-          ticks: { color: colors.text, maxRotation: 45 },
+          ticks: { ...periodXTicks(granularity, colors.text) },
           grid: { color: colors.grid },
         },
         y: {
@@ -71,7 +75,7 @@ const DonationsByDonorChart: React.FC<DonationsByDonorChartProps> = ({ labels, d
         },
       },
     }),
-    [colors]
+    [colors, granularity]
   );
 
   if (!hasData) {
@@ -80,7 +84,9 @@ const DonationsByDonorChart: React.FC<DonationsByDonorChartProps> = ({ labels, d
 
   return (
     <div className="chart-canvas-wrap">
-      <Bar ref={chartRef} data={chartData} options={options} />
+      <ScrollablePeriodChart granularity={granularity} labelCount={labels.length}>
+        <Bar ref={chartRef} data={chartData} options={options} />
+      </ScrollablePeriodChart>
     </div>
   );
 };

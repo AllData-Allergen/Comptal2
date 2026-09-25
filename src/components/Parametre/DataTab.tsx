@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import { open } from '@tauri-apps/plugin-dialog';
-import { FolderOpen, DatabaseZap, AlertTriangle, FolderSearch, PlayCircle, Tags, Trash2, FileSpreadsheet } from 'lucide-react';
+import { FolderOpen, DatabaseZap, AlertTriangle, FolderSearch, PlayCircle, Tags, Trash2, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { tauriBridge } from '../../services/tauri';
 import { Logger } from '../../services/logger';
 import { Db } from '../../services/db';
@@ -29,6 +29,7 @@ const DataTab: React.FC = () => {
   const [result, setResult] = useState<MigrationResult | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [labelRules, setLabelRules] = useState<LabelRule[]>([]);
+  const [excelBusy, setExcelBusy] = useState(false);
 
   const handleOpenDataFolder = async () => {
     try {
@@ -119,6 +120,20 @@ const DataTab: React.FC = () => {
     }
   };
 
+  const handleCumulativeExcelExport = async () => {
+    if (excelBusy) return;
+    setExcelBusy(true);
+    try {
+      const ok = await ExportService.exportCumulativeExcel();
+      if (ok) toast.success(t('settings.data.exportedExcel'));
+    } catch (err) {
+      Logger.error('DataTab.exportCumulativeExcel', err);
+      toast.error(t('common.error'));
+    } finally {
+      setExcelBusy(false);
+    }
+  };
+
   const handleRebuildAutocat = async () => {
     try {
       const count = await AutoCategorisationService.rebuildFromTransactions();
@@ -162,6 +177,15 @@ const DataTab: React.FC = () => {
           </button>
           <button className="ct-btn-secondary" onClick={() => void handleAccountantExport()}>
             <FileSpreadsheet size={16} /> {t('settings.data.exportAccountant')}
+          </button>
+          <button
+            className="ct-btn-primary"
+            onClick={() => void handleCumulativeExcelExport()}
+            disabled={excelBusy}
+            title={t('settings.data.exportCumulativeHint')}
+          >
+            {excelBusy ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
+            {t('settings.data.exportCumulative')}
           </button>
         </div>
       </section>

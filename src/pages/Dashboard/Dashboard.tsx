@@ -15,7 +15,7 @@ import {
   Tags,
 } from 'lucide-react';
 import { differenceInMonths, format, parseISO, subYears } from 'date-fns';
-import { Account, Category } from '../../types/models';
+import { Account, Category, CategoryGroup } from '../../types/models';
 import { ConfigService } from '../../services/ConfigService';
 import {
   AccountBalance,
@@ -28,8 +28,14 @@ import {
 } from '../../services/StatsService';
 import { ExportService } from '../../services/ExportService';
 import { Logger } from '../../services/logger';
+import { AmortissementService } from '../../services/AmortissementService';
+import { AmortissementSeries } from '../../types/amortissement';
 import { toIsoDate } from '../../utils/dateFormats';
 import { getPeriodLabel, sortPeriodKeys } from '../../utils/periodKeys';
+import {
+  aggregateCategoryTotals,
+  CategoryAggregation,
+} from '../../utils/categoryAggregate';
 import { ChartGranularity } from '../../types/projection';
 import FilterBox from '../../components/Dashboard/FilterBox';
 import SearchBar from '../../components/Dashboard/SearchBar';
@@ -56,6 +62,9 @@ const DashboardPage: React.FC = () => {
   const { t } = useTranslation();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryGroups, setCategoryGroups] = useState<CategoryGroup[]>([]);
+  const [categoryAggregation, setCategoryAggregation] =
+    useState<CategoryAggregation>('category');
   const [bounds, setBounds] = useState({ min: '', max: '' });
   const [periods, setPeriods] = useState<DistinctPeriods>(EMPTY_PERIODS);
   const [dateStart, setDateStart] = useState('');
@@ -93,21 +102,25 @@ const DashboardPage: React.FC = () => {
       associationMenu: true,
       contactsMenu: true,
       registerMenu: true,
+      amortissementMenu: true,
       hasInvoices: false,
       hasDonations: false,
+      hasImmobilisations: false,
     })
   );
   const [settingsDraft, setSettingsDraft] = useState<DashboardSettings>(dashSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [insights, setInsights] = useState<DashboardInsights>(EMPTY_DASHBOARD_INSIGHTS);
+  const [amortissementSeries, setAmortissementSeries] = useState<AmortissementSeries | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const [acc, cat, dates, distinct, appSettings, emetteur] = await Promise.all([
+        const [acc, cat, groups, dates, distinct, appSettings, emetteur] = await Promise.all([
           ConfigService.listAccounts(),
           ConfigService.listCategories(),
+          ConfigService.listCategoryGroups(),
           StatsService.dateBounds(),
           StatsService.distinctPeriods(),
           SettingsService.load(),
@@ -118,12 +131,14 @@ const DashboardPage: React.FC = () => {
           associationMenu: appSettings.menuVisibility.association,
           contactsMenu: appSettings.menuVisibility.clients,
           registerMenu: appSettings.menuVisibility.register,
+          amortissementMenu: appSettings.menuVisibility.amortissement,
           emetteurType: emetteur?.type,
         });
         setDashSettings(loadedSettings);
         setSettingsDraft(loadedSettings);
         setAccounts(acc);
         setCategories(cat);
+        setCategoryGroups(groups);
         setSelectedAccounts(new Set(acc.map((a) => String(a.id))));
         setSelectedCategories(new Set(cat.map((c) => c.code)));
         setPeriods(distinct);
@@ -176,7 +191,7 @@ const DashboardPage: React.FC = () => {
     setIsFiltering(true);
     try {
       const chartFilters = { ...filters, excludeCategories: ['X', 'Y'] as string[] };
-      const [kpi, cats, bals, seriesRows, insightsResult] = await Promise.all([
+      const [kpi, cats, bals, seriesRows, insightsResult, amortSeries] = await Promise.all([
         StatsService.kpis(filters),
         StatsService.categoryTotals(chartFilters),
         StatsService.accountBalancesAt(dateEnd, accountIds),
@@ -205,11 +220,20 @@ const DashboardPage: React.FC = () => {
           Logger.error('Dashboard.insights', error);
           return EMPTY_DASHBOARD_INSIGHTS;
         }),
+        dashSettings.widgets.charts.amortissement
+          ? AmortissementService.buildAmortissementSeries(granularity, dateStart, dateEnd).catch(
+              (error) => {
+                Logger.error('Dashboard.amortissement', error);
+                return null;
+              }
+            )
+          : Promise.resolve(null),
       ]);
       setKpis(kpi);
       setCatTotals(cats);
       setAccBalances(bals);
       setInsights(insightsResult);
+      setAmortissementSeries(amortSeries);
 
       const periodKeys = sortPeriodKeys(
         Array.from(new Set(seriesRows.map((r) => r.period))),
@@ -249,6 +273,18 @@ const DashboardPage: React.FC = () => {
     if (!dateStart || !dateEnd) return 1;
     return Math.max(1, differenceInMonths(parseISO(dateEnd), parseISO(dateStart)) + 1);
   }, [dateStart, dateEnd]);
+
+  const aggregatedCategories = useMemo(
+    () =>
+      aggregateCategoryTotals(
+        catTotals,
+        categories,
+        categoryGroups,
+        t('edition.ungroupedCategories'),
+        categoryAggregation
+      ),
+    [catTotals, categories, categoryGroups, categoryAggregation, t]
+  );
 
   const handleExport = async () => {
     setExportBusy(true);
@@ -534,8 +570,8 @@ const DashboardPage: React.FC = () => {
 
           <div className={`dashboard-tab-panel ${activeTab === 'charts' ? 'active' : ''}`}>
             <DashboardChartsPanel
-              catTotals={catTotals}
-              categories={categories}
+              catTotals={aggregatedCategories.totals}
+              categories={aggregatedCategories.categories}
               kpis={kpis}
               lineLabels={lineLabels}
               lineSeries={lineSeries}
@@ -546,6 +582,9 @@ const DashboardPage: React.FC = () => {
               donationsByDonorMode={dashSettings.donationsByDonorMode}
               unlinkedInvoices={insights.invoicing.unlinkedInvoiceCount}
               unlinkedDonations={insights.association.unlinkedDonationCount}
+              categoryAggregation={categoryAggregation}
+              onCategoryAggregationChange={setCategoryAggregation}
+              amortissementSeries={amortissementSeries}
             />
           </div>
 
@@ -554,13 +593,15 @@ const DashboardPage: React.FC = () => {
               kpis={kpis}
               accBalances={accBalances}
               accounts={accounts}
-              catTotals={catTotals}
-              categories={categories}
+              catTotals={aggregatedCategories.totals}
+              categories={aggregatedCategories.categories}
               months={months}
               dateStart={dateStart}
               dateEnd={dateEnd}
               insights={insights}
               summary={dashSettings.widgets.summary}
+              categoryAggregation={categoryAggregation}
+              onCategoryAggregationChange={setCategoryAggregation}
             />
           </div>
           </div>

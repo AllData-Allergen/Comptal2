@@ -2,18 +2,35 @@
 
 ## Dépendances
 
+Chaque ligne décrit un parcours autonome depuis la page Contacts jusqu'à son stockage ou son
+service externe.
+
 ```mermaid
-flowchart LR
-    PAGE[Client.tsx] --> TREE[ClientTree]
-    TREE --> FICHE[ContactFicheModal]
-    TREE --> DETAIL[ContactElementModal]
-    FICHE --> CLIENT[ClientService]
-    FICHE --> SIRENE[SireneAPIService]
-    TREE --> GROUP[ContactGroupService]
-    DETAIL --> INVOICE[InvoiceService]
-    CLIENT --> CT[(clients)]
-    GROUP --> CG[(contact_groups)]
-    INVOICE --> DOCS[(devis / factures)]
+flowchart TB
+    subgraph fiche [Consulter ou modifier une fiche]
+        direction LR
+        PAGE1[Client.tsx · ClientTree] --> FICHE[ContactFicheModal]
+        FICHE --> CLIENT[ClientService]
+        CLIENT --> CT[(clients)]
+    end
+
+    subgraph recherche [Rechercher une entreprise]
+        direction LR
+        PAGE2[ContactFicheModal] --> SIRENE[SireneAPIService]
+        SIRENE --> FORM[Préremplissage de la fiche]
+    end
+
+    subgraph groupes [Gérer les groupements]
+        direction LR
+        PAGE3[ClientTree] --> GROUP[ContactGroupService]
+        GROUP --> CG[(contact_groups)]
+    end
+
+    subgraph documents [Afficher les documents liés]
+        direction LR
+        PAGE4[ContactElementModal] --> INVOICE[InvoiceService]
+        INVOICE --> DOCS[(devis / factures)]
+    end
 ```
 
 ## Opérations

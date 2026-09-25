@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CheckSquare, SquareX } from 'lucide-react';
 import { Account, Category } from '../../types/models';
 import { CategorySwatch } from '../Common/CategoryX';
 
@@ -18,6 +19,8 @@ interface FilterPanelsProps {
   onUncategorized: (value: boolean) => void;
   onDates: (start: string, end: string) => void;
 }
+
+const NONE = '*';
 
 const FilterPanels: React.FC<FilterPanelsProps> = ({
   accounts,
@@ -39,11 +42,26 @@ const FilterPanels: React.FC<FilterPanelsProps> = ({
     set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   };
 
+  const isAccountNone = selectedAccounts.length === 1 && selectedAccounts[0] === (NONE as unknown as number);
+  const isCategoryNone = selectedCategories.length === 1 && selectedCategories[0] === NONE;
+
   const isAccountSelected = (id: number) =>
-    selectedAccounts.length === 0 || selectedAccounts.includes(id);
+    !isAccountNone && (selectedAccounts.length === 0 || selectedAccounts.includes(id));
 
   const isCategorySelected = (code: string) =>
-    selectedCategories.length === 0 || selectedCategories.includes(code);
+    !isCategoryNone && (selectedCategories.length === 0 || selectedCategories.includes(code));
+
+  const accountsAllSelected = !isAccountNone && (selectedAccounts.length === 0);
+  const categoriesAllSelected = !isCategoryNone && (selectedCategories.length === 0);
+
+  const toggleAllAccounts = () => {
+    onAccounts(accountsAllSelected ? [NONE as unknown as number] : []);
+  };
+
+  const toggleAllCategories = () => {
+    if (uncategorizedOnly) return;
+    onCategories(categoriesAllSelected ? [NONE] : []);
+  };
 
   const navButton = (tab: FilterTab, label: string) => (
     <button
@@ -63,27 +81,40 @@ const FilterPanels: React.FC<FilterPanelsProps> = ({
         {navButton('period', t('edition.period'))}
       </div>
       <div className="edition-filter-strip">
-        {activeTab === 'accounts' &&
-          accounts.map((a) => {
-            const selected = isAccountSelected(a.id);
-            return (
-              <button
-                key={a.id}
-                type="button"
-                className={`edition-filter-chip${selected ? ' selected' : ''}`}
-                onClick={() => {
-                  if (selectedAccounts.length === 0) {
-                    onAccounts(accounts.filter((x) => x.id !== a.id).map((x) => x.id));
-                  } else {
-                    toggle(selectedAccounts, a.id, onAccounts);
-                  }
-                }}
-              >
-                <span className="edition-filter-chip-dot" style={{ backgroundColor: a.color }} />
-                {a.code}
-              </button>
-            );
-          })}
+        {activeTab === 'accounts' && (
+          <>
+            <button
+              type="button"
+              className="edition-filter-select-all"
+              onClick={toggleAllAccounts}
+            >
+              {accountsAllSelected ? <SquareX size={14} /> : <CheckSquare size={14} />}
+              {accountsAllSelected ? t('common.deselectAll') : t('common.selectAll')}
+            </button>
+            {accounts.map((a) => {
+              const selected = isAccountSelected(a.id);
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  className={`edition-filter-chip${selected ? ' selected' : ''}`}
+                  onClick={() => {
+                    if (selectedAccounts.length === 0) {
+                      onAccounts(accounts.filter((x) => x.id !== a.id).map((x) => x.id));
+                    } else if (isAccountNone) {
+                      onAccounts([a.id]);
+                    } else {
+                      toggle(selectedAccounts, a.id, onAccounts);
+                    }
+                  }}
+                >
+                  <span className="edition-filter-chip-dot" style={{ backgroundColor: a.color }} />
+                  {a.code}
+                </button>
+              );
+            })}
+          </>
+        )}
         {activeTab === 'categories' && (
           <>
             <button
@@ -92,6 +123,15 @@ const FilterPanels: React.FC<FilterPanelsProps> = ({
               onClick={() => onUncategorized(!uncategorizedOnly)}
             >
               {t('edition.uncategorizedShort')}
+            </button>
+            <button
+              type="button"
+              className="edition-filter-select-all"
+              disabled={uncategorizedOnly}
+              onClick={toggleAllCategories}
+            >
+              {categoriesAllSelected ? <SquareX size={14} /> : <CheckSquare size={14} />}
+              {categoriesAllSelected ? t('common.deselectAll') : t('common.selectAll')}
             </button>
             {categories.map((c) => {
               const selected = !uncategorizedOnly && isCategorySelected(c.code);
@@ -104,6 +144,8 @@ const FilterPanels: React.FC<FilterPanelsProps> = ({
                   onClick={() => {
                     if (selectedCategories.length === 0) {
                       onCategories(categories.filter((x) => x.code !== c.code).map((x) => x.code));
+                    } else if (isCategoryNone) {
+                      onCategories([c.code]);
                     } else {
                       toggle(selectedCategories, c.code, onCategories);
                     }

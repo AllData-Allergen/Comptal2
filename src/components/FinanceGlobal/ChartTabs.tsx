@@ -5,6 +5,7 @@ import {
   BarChart3,
   FileText,
   Handshake,
+  Landmark,
   LineChart,
   Scale,
   Users,
@@ -27,6 +28,7 @@ const TAB_ICONS: Record<FinanceTabId, React.ReactNode> = {
   facturation: <FileText size={16} />,
   dons: <Handshake size={16} />,
   contacts: <Users size={16} />,
+  amortissement: <Landmark size={16} />,
 };
 
 const ChartTabs: React.FC<ChartTabsProps> = ({ tabs, active, onChange }) => {

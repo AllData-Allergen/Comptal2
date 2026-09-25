@@ -276,16 +276,18 @@ const ProjectionVsReality: React.FC<ProjectionVsRealityProps> = ({
           id: String(monthIndex),
           isOdd: monthIndex % 2 !== 0,
           cells: [
-            { content: label },
+            { content: label, text: label },
             {
               content: reality !== 0 ? formatMoney(reality) : '-',
               value: reality,
+              text: reality,
               colorize: true,
               align: 'right' as const,
             },
             {
               content: projection !== 0 ? formatMoney(projection) : '-',
               value: projection,
+              text: projection,
               colorize: true,
               align: 'right' as const,
             },
@@ -302,16 +304,18 @@ const ProjectionVsReality: React.FC<ProjectionVsRealityProps> = ({
           id: String(monthIndex),
           isOdd: monthIndex % 2 !== 0,
           cells: [
-            { content: label },
+            { content: label, text: label },
             {
               content: reality !== 0 ? formatMoney(reality) : '-',
               value: reality,
+              text: reality,
               colorize: true,
               align: 'right' as const,
             },
             {
               content: projection !== 0 ? formatMoney(projection) : '-',
               value: projection,
+              text: projection,
               colorize: true,
               align: 'right' as const,
             },
@@ -323,7 +327,7 @@ const ProjectionVsReality: React.FC<ProjectionVsRealityProps> = ({
       id: String(monthIndex),
       isOdd: monthIndex % 2 !== 0,
       cells: [
-        { content: label },
+        { content: label, text: label },
         ...data.categories.flatMap((catName, catIndex) => {
           const reality = data.realityByCategory[catIndex]?.[monthIndex] ?? 0;
           const projection = data.projectionByCategory[catName]?.[monthIndex] ?? 0;
@@ -331,12 +335,14 @@ const ProjectionVsReality: React.FC<ProjectionVsRealityProps> = ({
             {
               content: reality !== 0 ? formatMoney(reality) : '-',
               value: reality,
+              text: reality,
               colorize: true,
               align: 'right' as const,
             },
             {
               content: projection !== 0 ? formatMoney(projection) : '-',
               value: projection,
+              text: projection,
               colorize: true,
               align: 'right' as const,
             },
@@ -348,8 +354,9 @@ const ProjectionVsReality: React.FC<ProjectionVsRealityProps> = ({
               ? formatMoney(data.realityTotals[monthIndex] ?? 0)
               : '-',
           value: data.realityTotals[monthIndex] ?? 0,
+          text: data.realityTotals[monthIndex] ?? 0,
           colorize: true,
-          align: 'right',
+          align: 'right' as const,
         },
         {
           content:
@@ -357,8 +364,9 @@ const ProjectionVsReality: React.FC<ProjectionVsRealityProps> = ({
               ? formatMoney(data.projectionTotals[monthIndex] ?? 0)
               : '-',
           value: data.projectionTotals[monthIndex] ?? 0,
+          text: data.projectionTotals[monthIndex] ?? 0,
           colorize: true,
-          align: 'right',
+          align: 'right' as const,
         },
       ],
     }));
@@ -386,6 +394,7 @@ const ProjectionVsReality: React.FC<ProjectionVsRealityProps> = ({
           projection={data.projectionByCategory[selectedCategory] ?? []}
           color={data.categoryColors[selectedCategory] ?? '#808080'}
           categoryName={selectedCategory || t('financeGlobal.category')}
+          granularity={granularity}
         />
       );
     }
@@ -396,6 +405,7 @@ const ProjectionVsReality: React.FC<ProjectionVsRealityProps> = ({
         categoryColors={data.categoryColors}
         realityByCategory={data.realityByCategory}
         projectionByCategory={data.projectionByCategory}
+        granularity={granularity}
       />
     );
   };
@@ -495,7 +505,13 @@ const ProjectionVsReality: React.FC<ProjectionVsRealityProps> = ({
           <div className="finance-global-chart-container chart-container-with-toolbar">
             <div className="chart active">{chart()}</div>
           </div>
-          <FinanceTable columns={tableColumns} rows={tableRows} stickyOffsets={[0]} />
+          <FinanceTable
+            columns={tableColumns}
+            rows={tableRows}
+            stickyOffsets={[0]}
+            exportFileName="finance_projection"
+            exportSheetName={t('finance.tabProjection')}
+          />
         </>
       ) : (
         <div className="finance-empty">

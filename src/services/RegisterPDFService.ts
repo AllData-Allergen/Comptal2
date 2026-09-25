@@ -67,8 +67,20 @@ function totalsContent(document: RegisterDocument): Content[] {
     ['natureNumeraire', tr('register.totals.natureNumeraire')],
     ['natureInKind', tr('register.totals.natureInKind')],
     ['natureSkills', tr('register.totals.natureSkills')],
+    ['immoCount', tr('register.totals.immoCount')],
+    ['immoBrut', tr('register.totals.immoBrut')],
+    ['immoAmorti', tr('register.totals.immoAmorti')],
+    ['immoDotation', tr('register.totals.immoDotation')],
+    ['immoVnc', tr('register.totals.immoVnc')],
   ];
-  const countKeys = new Set(['donationCount', 'receiptCount', 'cancelledReceipts', 'particuliers', 'entreprises']);
+  const countKeys = new Set([
+    'donationCount',
+    'receiptCount',
+    'cancelledReceipts',
+    'particuliers',
+    'entreprises',
+    'immoCount',
+  ]);
   return labels
     .filter(([key]) => totals[key] != null)
     .map(([key, label]) => ({
@@ -158,6 +170,43 @@ function snapshotTable(document: RegisterDocument, color: string): Content | nul
           ...document.snapshot.rows.map((row) => [
             registerRowLabel(row),
             [registerRowDetail(row), registerRowExtra(row)].filter(Boolean).join(' — '),
+            { text: formatMoney(Number(row.amount ?? 0)), alignment: 'right' as Alignment },
+          ]),
+        ] as TableCell[][],
+      },
+      layout: 'lightHorizontalLines',
+      margin: [0, 12, 0, 14],
+    };
+  }
+  if (type === 'amortissement_register') {
+    return {
+      table: {
+        headerRows: 1,
+        widths: ['*', '*', 'auto', 'auto', 'auto', 'auto', 'auto'],
+        body: [
+          headerCells([
+            tr('register.colLabel'),
+            tr('register.colDetail'),
+            tr('common.status'),
+            tr('register.colImmoBrut'),
+            tr('register.colImmoAmorti'),
+            tr('register.colImmoDotation'),
+            tr('register.colImmoVnc'),
+          ], color),
+          ...document.snapshot.rows.map((row) => [
+            {
+              stack: [
+                { text: registerRowLabel(row), bold: true },
+                ...(registerRowExtra(row)
+                  ? [{ text: registerRowExtra(row), fontSize: 8, color: '#64748b' }]
+                  : []),
+              ],
+            },
+            registerRowDetail(row) || '—',
+            registerStatusLabel(row.status) || '—',
+            { text: formatMoney(Number(row.credit ?? 0)), alignment: 'right' as Alignment },
+            { text: formatMoney(Number(row.debit ?? 0)), alignment: 'right' as Alignment },
+            { text: formatMoney(Number(row.periodCharge ?? 0)), alignment: 'right' as Alignment },
             { text: formatMoney(Number(row.amount ?? 0)), alignment: 'right' as Alignment },
           ]),
         ] as TableCell[][],
@@ -342,7 +391,7 @@ async function buildDefinition(
   }
   return {
     pageSize: settings.pdfFormat === 'Letter' ? 'LETTER' : 'A4',
-    pageOrientation: settings.pdfOrientation,
+    pageOrientation: type === 'amortissement_register' ? 'landscape' : settings.pdfOrientation,
     pageMargins: [40, 40, 40, 40],
     content,
     defaultStyle: { fontSize: 9, color: '#0f172a' },
@@ -444,6 +493,45 @@ function samplePreviewDocument(
           { label: tr('register.pdf.previewDues'), debit: 0, credit: 1800 },
         ],
         totals: { expenses: 420, credits: 1800, balance: 1380 },
+      },
+    };
+  }
+  if (type === 'amortissement_register') {
+    return {
+      ...base,
+      snapshot: {
+        registerType: type,
+        periodStart,
+        periodEnd,
+        rows: [
+          {
+            label: tr('register.pdf.previewLaptop'),
+            detail: tr('register.pdf.previewLaptopDetail'),
+            extra: tr('register.pdf.previewLinear3y'),
+            status: 'actif',
+            credit: 1200,
+            debit: 800,
+            periodCharge: 400,
+            amount: 400,
+          },
+          {
+            label: tr('register.pdf.previewVehicle'),
+            detail: tr('register.pdf.previewVehicleDetail'),
+            extra: tr('register.pdf.previewLinear5y'),
+            status: 'actif',
+            credit: 18000,
+            debit: 7200,
+            periodCharge: 3600,
+            amount: 10800,
+          },
+        ],
+        totals: {
+          immoCount: 2,
+          immoBrut: 19200,
+          immoAmorti: 8000,
+          immoDotation: 4000,
+          immoVnc: 11200,
+        },
       },
     };
   }

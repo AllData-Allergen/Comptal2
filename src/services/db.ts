@@ -5,7 +5,7 @@ import i18n from '../i18n/config';
 import { Logger, withLog } from './logger';
 import { assertSafeProfileId } from '../utils/security';
 
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 17;
 
 const SCHEMA_V1: string[] = [
   `CREATE TABLE IF NOT EXISTS accounts (
@@ -325,8 +325,57 @@ const SCHEMA_V15: string[] = [
   )`,
 ];
 
+const SCHEMA_V16: string[] = [
+  `CREATE TABLE IF NOT EXISTS immobilisations (
+    id TEXT PRIMARY KEY,
+    designation TEXT NOT NULL,
+    reference TEXT,
+    type_immobilisation TEXT NOT NULL CHECK(type_immobilisation IN (
+      'materiel_informatique','materiel_bureau','outillage','vehicule','mobilier','logiciel','autre'
+    )),
+    valeur_acquisition_ht REAL NOT NULL DEFAULT 0,
+    taux_tva REAL NOT NULL DEFAULT 20,
+    date_acquisition TEXT NOT NULL,
+    date_mise_en_service TEXT NOT NULL,
+    duree_annees REAL NOT NULL DEFAULT 5,
+    methode TEXT NOT NULL DEFAULT 'lineaire' CHECK(methode IN ('lineaire','degressif','non_amortissable')),
+    valeur_residuelle REAL NOT NULL DEFAULT 0,
+    statut TEXT NOT NULL DEFAULT 'actif' CHECK(statut IN ('actif','cede','mis_au_rebut')),
+    date_cession TEXT,
+    valeur_cession REAL,
+    fournisseur TEXT,
+    facture_ref TEXT,
+    notes TEXT,
+    faible_valeur INTEGER NOT NULL DEFAULT 0,
+    subvention_investissement REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_immo_statut ON immobilisations(statut)`,
+  `CREATE INDEX IF NOT EXISTS idx_immo_type ON immobilisations(type_immobilisation)`,
+  `CREATE INDEX IF NOT EXISTS idx_immo_mise_en_service ON immobilisations(date_mise_en_service)`,
+  `CREATE TABLE IF NOT EXISTS amortissement_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    payload TEXT NOT NULL
+  )`,
+];
+
+const SCHEMA_V17: string[] = [
+  `CREATE TABLE IF NOT EXISTS immobilisation_attachments (
+    id TEXT PRIMARY KEY,
+    immobilisation_id TEXT NOT NULL REFERENCES immobilisations(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    path TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_immo_attachments_immo ON immobilisation_attachments(immobilisation_id)`,
+];
+
 let db: Database | null = null;
 let currentProfileId: string | null = null;
+let transactionQueue: Promise<void> = Promise.resolve();
+let transactionActive = false;
 
 function requireDb(): Database {
   if (!db) {
@@ -361,6 +410,8 @@ async function ensureSchema(database: Database): Promise<void> {
     ...SCHEMA_V13,
     ...SCHEMA_V14,
     ...SCHEMA_V15,
+    ...SCHEMA_V16,
+    ...SCHEMA_V17,
   ]) {
     await database.execute(statement);
   }
@@ -492,13 +543,22 @@ export const Db = {
       }
       const root = sessionInfo.dataRoot.replace(/\\/g, '/');
       const path = `${root}/profils/${profileId}/comptal.db`;
-      db = await Database.load(`sqlite:${path}`);
-      await db.execute('PRAGMA foreign_keys = ON');
-      await db.execute('PRAGMA journal_mode = WAL');
-      await db.execute('PRAGMA busy_timeout = 10000');
-      await migrate(db);
-      currentProfileId = profileId;
-      Logger.data('Db.openForProfile', 'Base ouverte');
+      let opened: Database | null = null;
+      try {
+        opened = await Database.load(`sqlite:${path}`);
+        await opened.execute('PRAGMA foreign_keys = ON');
+        await opened.execute('PRAGMA journal_mode = WAL');
+        await opened.execute('PRAGMA busy_timeout = 10000');
+        await migrate(opened);
+        db = opened;
+        currentProfileId = profileId;
+        Logger.data('Db.openForProfile', 'Base ouverte');
+      } catch (err) {
+        await opened?.close().catch(() => undefined);
+        db = null;
+        currentProfileId = null;
+        throw err;
+      }
     }, { data: { profileId } });
   },
 
@@ -556,15 +616,27 @@ export const Db = {
 
   /** Exécute un lot d'instructions dans une transaction SQL (pool SQLite = 1 connexion). */
   async inTransaction(fnName: string, run: () => Promise<void>): Promise<void> {
-    const database = requireDb();
-    await database.execute('BEGIN IMMEDIATE');
-    try {
-      await run();
-      await database.execute('COMMIT');
-    } catch (err) {
-      await database.execute('ROLLBACK').catch(() => undefined);
-      Logger.error(fnName, err, 'Transaction annulée (ROLLBACK)');
-      throw err;
+    if (transactionActive) {
+      throw new Error(`Transaction imbriquée refusée (${fnName})`);
     }
+    const database = requireDb();
+    const task = transactionQueue.then(async () => {
+      transactionActive = true;
+      try {
+        await database.execute('BEGIN IMMEDIATE');
+        try {
+          await run();
+          await database.execute('COMMIT');
+        } catch (err) {
+          await database.execute('ROLLBACK').catch(() => undefined);
+          Logger.error(fnName, err, 'Transaction annulée (ROLLBACK)');
+          throw err;
+        }
+      } finally {
+        transactionActive = false;
+      }
+    });
+    transactionQueue = task.catch(() => undefined);
+    return task;
   },
 };

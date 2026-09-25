@@ -7,6 +7,7 @@ interface StatsSummaryWidgetProps {
   stats: ProjectionStats;
 }
 
+/** Cartes KPI : totaux débits / crédits / flux net / solde final. */
 const StatsSummaryWidget: React.FC<StatsSummaryWidgetProps> = ({ stats }) => {
   const { t } = useTranslation();
   const items = [

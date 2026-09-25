@@ -3,15 +3,17 @@ import { useTranslation } from 'react-i18next';
 import { ChartOptions } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { BilanChartData } from '../../services/StatsService';
+import { CategoryAggregation } from '../../utils/categoryAggregate';
 import { formatMoney } from '../../utils/amounts';
 import { chartAxisColor, chartGridColor, chartTooltipTheme } from '../../utils/chartPastel';
 import '../../utils/registerCharts';
 
 interface BilanChartsProps {
   data: BilanChartData;
+  aggregation: CategoryAggregation;
 }
 
-const BilanCharts: React.FC<BilanChartsProps> = ({ data }) => {
+const BilanCharts: React.FC<BilanChartsProps> = ({ data, aggregation }) => {
   const { t } = useTranslation();
   const [isDarkMode, setIsDarkMode] = useState(() =>
     document.documentElement.classList.contains('dark')
@@ -64,11 +66,18 @@ const BilanCharts: React.FC<BilanChartsProps> = ({ data }) => {
 
   const hasCredits = creditsBarData.values.some((v) => v > 0);
   const hasDebits = debitsBarData.values.some((v) => v !== 0);
+  const byGroup = aggregation === 'group';
 
   return (
     <div className="bilan-charts-grid">
       <div className="bilan-chart-cell">
-        <h3 className="bilan-chart-title">{t('financeGlobal.bilanChartDebitsByCategory')}</h3>
+        <h3 className="bilan-chart-title">
+          {t(
+            byGroup
+              ? 'financeGlobal.bilanChartDebitsByGroup'
+              : 'financeGlobal.bilanChartDebitsByCategory'
+          )}
+        </h3>
         <div className="bilan-chart-inner">
           {hasDebits ? (
             <Bar
@@ -90,7 +99,13 @@ const BilanCharts: React.FC<BilanChartsProps> = ({ data }) => {
         </div>
       </div>
       <div className="bilan-chart-cell">
-        <h3 className="bilan-chart-title">{t('financeGlobal.bilanChartCreditsByCategory')}</h3>
+        <h3 className="bilan-chart-title">
+          {t(
+            byGroup
+              ? 'financeGlobal.bilanChartCreditsByGroup'
+              : 'financeGlobal.bilanChartCreditsByCategory'
+          )}
+        </h3>
         <div className="bilan-chart-inner">
           {hasCredits ? (
             <Bar

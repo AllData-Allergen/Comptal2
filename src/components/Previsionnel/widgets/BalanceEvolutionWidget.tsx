@@ -12,12 +12,18 @@ import {
   chartTooltipTheme,
 } from '../../../utils/chartPastel';
 import '../../../utils/registerCharts';
+import { ChartGranularity } from '../../../types/projection';
+import { periodXTicks } from '../../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../../Common/ScrollablePeriodChart';
+import PrevisionnelChartFrame from '../PrevisionnelChartFrame';
 
 interface BalanceEvolutionWidgetProps {
   series: BalanceSeries;
+  granularity: ChartGranularity;
 }
 
-const BalanceEvolutionWidget: React.FC<BalanceEvolutionWidgetProps> = ({ series }) => {
+/** Courbe d’évolution du solde projeté sur la période (débits/crédits/net en tooltip). */
+const BalanceEvolutionWidget: React.FC<BalanceEvolutionWidgetProps> = ({ series, granularity }) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -71,20 +77,22 @@ const BalanceEvolutionWidget: React.FC<BalanceEvolutionWidgetProps> = ({ series 
         },
       },
       scales: {
-        x: { ticks: { color, maxRotation: 0 }, grid: { color: grid } },
+        x: { ticks: { ...periodXTicks(granularity, color) }, grid: { color: grid } },
         y: {
           ticks: { color, callback: (v) => formatMoney(Number(v)) },
           grid: { color: grid },
         },
       },
     }),
-    [color, grid, tooltip, series, t]
+    [color, grid, tooltip, series, t, granularity]
   );
 
   return (
-    <div className="previsionnel-chart-h">
-      <Line data={data} options={options} />
-    </div>
+    <PrevisionnelChartFrame>
+      <ScrollablePeriodChart granularity={granularity} labelCount={series.labels.length}>
+        <Line data={data} options={options} />
+      </ScrollablePeriodChart>
+    </PrevisionnelChartFrame>
   );
 };
 

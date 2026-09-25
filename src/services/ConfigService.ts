@@ -64,12 +64,13 @@ export const ConfigService = {
     name: string;
     color: string;
     initialBalance?: number;
-  }): Promise<void> {
+  }): Promise<number> {
     return withLog('ConfigService.createAccount', async () => {
-      await Db.execute(
+      const result = await Db.execute(
         'INSERT INTO accounts (code, name, color, initial_balance) VALUES (?, ?, ?, ?)',
         [input.code.trim(), input.name.trim(), input.color, input.initialBalance ?? 0]
       );
+      return result.lastInsertId ?? 0;
     }, { data: { code: input.code } });
   },
 

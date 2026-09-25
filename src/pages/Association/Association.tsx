@@ -23,6 +23,7 @@ import { AssociationConfig, Donation, DonationRule, ReceiptSignature } from '../
 import { Category } from '../../types/models';
 import { Client } from '../../types/invoice';
 import { clientDisplayName, formatMoney } from '../../utils/invoiceFormat';
+import { registerDateLocale } from '../../utils/registerI18n';
 import '../../styles/association-custom.css';
 import '../../styles/organization-custom.css';
 
@@ -36,7 +37,7 @@ type Tab = 'dons' | 'transactions' | 'rules' | 'recus';
 
 const Association: React.FC = () => {
   const { t, i18n } = useTranslation();
-  const dateLocale = i18n.language.startsWith('en') ? 'en-GB' : 'fr-FR';
+  const dateLocale = registerDateLocale(i18n.language);
   const [tab, setTab] = useState<Tab>('dons');
   const [donations, setDonations] = useState<Donation[]>([]);
   const [donors, setDonors] = useState<Client[]>([]);

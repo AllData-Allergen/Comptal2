@@ -24,6 +24,7 @@ const CHART_KEYS: Array<keyof DashboardChartWidgets> = [
   'invoiceVsPayment',
   'invoiceAging',
   'donationsByDonor',
+  'amortissement',
 ];
 
 const SUMMARY_KEYS: Array<keyof DashboardSummaryWidgets> = [

@@ -164,6 +164,8 @@ association, modèles PDF et mentions légales.
 
 ## Schéma d'appel global
 
+### Navigation vers les onglets
+
 ```mermaid
 flowchart TD
     P[Parametre.tsx] --> G[GeneralTab]
@@ -173,13 +175,30 @@ flowchart TD
     P --> D[DataTab]
     P --> O[OrganizationTab]
     P --> AB[AboutTab]
-    G --> SETTINGS[SettingsService + WindowService]
-    PR --> PROFILE[ProfileService + ZIP IPC]
-    A --> CONFIG[ConfigService]
-    C --> CONFIG
-    D --> DATA[MigrationService + AutoCategorisationService + Db]
-    O --> ORG[Emetteur + Association + PDF + SIRENE]
-    AB --> UPDATE[UpdateService]
+```
+
+### Service principal de chaque onglet
+
+```mermaid
+flowchart TB
+    subgraph global [Réglages globaux]
+        direction LR
+        G[GeneralTab] --> SETTINGS[SettingsService + WindowService]
+        PR[ProfilesTab] --> PROFILE[ProfileService + ZIP IPC]
+    end
+
+    subgraph profile [Données du profil]
+        direction LR
+        A[AccountsTab] --> CONFIG1[ConfigService]
+        C[CategoriesTab] --> CONFIG2[ConfigService]
+        D[DataTab] --> DATA[MigrationService + AutoCategorisationService + Db]
+    end
+
+    subgraph organization [Organisation et application]
+        direction LR
+        O[OrganizationTab] --> ORG[Emetteur + Association + PDF + SIRENE]
+        AB[AboutTab] --> UPDATE[UpdateService]
+    end
 ```
 
 ---

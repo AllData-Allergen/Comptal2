@@ -138,11 +138,11 @@ const PostesPanel: React.FC<PostesPanelProps> = ({ kind }) => {
                     value={editing.unite}
                     onChange={(e) => setEditing({ ...editing, unite: e.target.value })}
                   >
-                    <option value="unite">Unité</option>
-                    <option value="h">h</option>
-                    <option value="forfait">Forfait</option>
-                    <option value="m2">m²</option>
-                    <option value="kg">kg</option>
+                    <option value="unite">{t('facturation.units.unit')}</option>
+                    <option value="h">{t('facturation.units.hour')}</option>
+                    <option value="forfait">{t('facturation.units.flatRate')}</option>
+                    <option value="m2">{t('facturation.units.squareMeter')}</option>
+                    <option value="kg">{t('facturation.units.kilogram')}</option>
                   </select>
                 </label>
               </>
@@ -176,7 +176,7 @@ const PostesPanel: React.FC<PostesPanelProps> = ({ kind }) => {
               </>
             )}
             <label className="org-field">
-              <span>TVA %</span>
+              <span>{t('facturation.vatRate')}</span>
               <input
                 type="number"
                 value={editing.tauxTVA}
@@ -202,7 +202,7 @@ const PostesPanel: React.FC<PostesPanelProps> = ({ kind }) => {
             <div>
               <div className="inv-row-title">{poste.designation}</div>
               <div className="inv-row-meta" style={{ marginLeft: 0 }}>
-                {poste.type} · TVA {poste.tauxTVA}%
+                {t(`facturation.posteTypes.${poste.type}`)} · {t('facturation.vatRate')} {poste.tauxTVA}%
               </div>
             </div>
             <div className="flex gap-2">

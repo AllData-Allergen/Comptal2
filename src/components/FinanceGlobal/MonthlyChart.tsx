@@ -3,14 +3,26 @@ import { useTranslation } from 'react-i18next';
 import { Chart as ChartJS, ChartOptions } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { CategorySummary } from '../../services/StatsService';
+import { ConfigService } from '../../services/ConfigService';
+import { Category, CategoryGroup } from '../../types/models';
+import {
+  aggregateMonthlyChart,
+  CategoryAggregation,
+  UNGROUPED_CODE,
+} from '../../utils/categoryAggregate';
 import { formatMoney } from '../../utils/amounts';
 import {
   chartAxisColor,
   chartGridCallback,
   chartTooltipTheme,
 } from '../../utils/chartPastel';
+import { Logger } from '../../services/logger';
+import CategoryAggToggle from '../Common/CategoryAggToggle';
 import FinanceTable, { formatCellMoney, FinanceTableColumn, FinanceTableRow } from './FinanceTable';
 import '../../utils/registerCharts';
+import { ChartGranularity } from '../../types/projection';
+import { periodXTicks } from '../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../Common/ScrollablePeriodChart';
 
 type MixedDataset = {
   label: string;
@@ -33,7 +45,11 @@ interface MonthlyChartProps {
   categories: string[];
   categoryColors: Record<string, string>;
   monthlyData: number[][];
+  incomeData: number[][];
+  expensesData: number[][];
   summaries: CategorySummary[];
+  categoryConfigs: Category[];
+  granularity: ChartGranularity;
 }
 
 const MonthlyChart: React.FC<MonthlyChartProps> = ({
@@ -41,13 +57,19 @@ const MonthlyChart: React.FC<MonthlyChartProps> = ({
   categories,
   categoryColors,
   monthlyData,
+  incomeData,
+  expensesData,
   summaries,
+  categoryConfigs,
+  granularity,
 }) => {
   const { t } = useTranslation();
   const chartRef = useRef<ChartJS<'bar'>>(null);
   const [isDarkMode, setIsDarkMode] = useState(() =>
     document.documentElement.classList.contains('dark')
   );
+  const [aggregation, setAggregation] = useState<CategoryAggregation>('category');
+  const [groups, setGroups] = useState<CategoryGroup[]>([]);
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -56,6 +78,46 @@ const MonthlyChart: React.FC<MonthlyChartProps> = ({
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setGroups(await ConfigService.listCategoryGroups());
+      } catch (err) {
+        Logger.error('MonthlyChart.loadGroups', err);
+      }
+    })();
+  }, []);
+
+  const view = useMemo(
+    () =>
+      aggregateMonthlyChart(
+        categories,
+        categoryColors,
+        monthlyData,
+        incomeData,
+        expensesData,
+        summaries,
+        categoryConfigs,
+        groups,
+        t('edition.ungroupedCategories'),
+        t('financeGlobal.credit'),
+        t('financeGlobal.debit'),
+        aggregation
+      ),
+    [
+      categories,
+      categoryColors,
+      monthlyData,
+      incomeData,
+      expensesData,
+      summaries,
+      categoryConfigs,
+      groups,
+      aggregation,
+      t,
+    ]
+  );
 
   const calculateYAxisLimits = useCallback((datasets: MixedDataset[]) => {
     const numMonths = datasets[0]?.data.length || 0;
@@ -77,20 +139,20 @@ const MonthlyChart: React.FC<MonthlyChartProps> = ({
     return { min: minNegative - range * 0.02, max: maxPositive + range * 0.02 };
   }, []);
 
-  const monthlyTotals = useMemo(
+  const periodTotals = useMemo(
     () =>
       periodLabels.map((_, monthIndex) =>
-        monthlyData.reduce((total, cat) => total + (cat[monthIndex] || 0), 0)
+        view.monthlyData.reduce((total, cat) => total + (cat[monthIndex] || 0), 0)
       ),
-    [monthlyData, periodLabels]
+    [view.monthlyData, periodLabels]
   );
 
   const barDatasets: MixedDataset[] = useMemo(
     () =>
-      categories.map((category, index) => ({
+      view.categories.map((category, index) => ({
         label: category,
-        data: monthlyData[index] ?? [],
-        backgroundColor: categoryColors[category] || '#808080',
+        data: view.monthlyData[index] ?? [],
+        backgroundColor: view.categoryColors[category] || '#808080',
         borderColor: 'rgba(0, 0, 0, 0.3)',
         borderWidth: 1,
         type: 'bar' as const,
@@ -98,17 +160,17 @@ const MonthlyChart: React.FC<MonthlyChartProps> = ({
         barPercentage: 0.98,
         categoryPercentage: 0.98,
       })),
-    [categories, monthlyData, categoryColors]
+    [view.categories, view.monthlyData, view.categoryColors]
   );
 
   const lineDataset: MixedDataset = useMemo(
     () => ({
       label: t('financeGlobal.total'),
-      data: monthlyTotals,
-      backgroundColor: monthlyTotals.map((v) =>
+      data: periodTotals,
+      backgroundColor: periodTotals.map((v) =>
         v >= 0 ? 'rgba(40, 167, 69, 0.6)' : 'rgba(220, 53, 69, 0.6)'
       ),
-      borderColor: monthlyTotals.map((v) =>
+      borderColor: periodTotals.map((v) =>
         v >= 0 ? 'rgba(40, 167, 69, 0.8)' : 'rgba(220, 53, 69, 0.8)'
       ),
       borderWidth: 2,
@@ -119,7 +181,7 @@ const MonthlyChart: React.FC<MonthlyChartProps> = ({
       order: 0,
       tension: 0.4,
     }),
-    [monthlyTotals, t]
+    [periodTotals, t]
   );
 
   const initialLimits = useMemo(
@@ -136,9 +198,7 @@ const MonthlyChart: React.FC<MonthlyChartProps> = ({
           stacked: true,
           grid: { display: false },
           ticks: {
-            color: chartAxisColor(isDarkMode),
-            maxRotation: 45,
-            minRotation: 45,
+            ...periodXTicks(granularity, chartAxisColor(isDarkMode)),
           },
         },
         y: {
@@ -184,12 +244,15 @@ const MonthlyChart: React.FC<MonthlyChartProps> = ({
         },
       },
     }),
-    [initialLimits, calculateYAxisLimits, isDarkMode]
+    [initialLimits, calculateYAxisLimits, isDarkMode, granularity]
   );
+
+  const abbrLabel =
+    aggregation === 'group' ? t('financeGlobal.group') : t('financeGlobal.abbreviation');
 
   const tableColumns: FinanceTableColumn[] = useMemo(
     () => [
-      { key: 'code', label: t('financeGlobal.abbreviation'), sticky: true, width: 80 },
+      { key: 'code', label: abbrLabel, sticky: true, width: 80 },
       { key: 'name', label: t('financeGlobal.fullName'), sticky: true, width: 200 },
       { key: 'avg', label: t('financeGlobal.average'), sticky: true, width: 110, align: 'right' },
       { key: 'sum', label: t('financeGlobal.sum'), sticky: true, width: 110, align: 'right' },
@@ -199,19 +262,24 @@ const MonthlyChart: React.FC<MonthlyChartProps> = ({
         align: 'right' as const,
       })),
     ],
-    [periodLabels, t]
+    [periodLabels, t, abbrLabel]
   );
 
   const tableRows: FinanceTableRow[] = useMemo(() => {
-    const rows: FinanceTableRow[] = summaries.map((cat, rowIndex) => {
-      const catName = cat.categoryName;
-      const dataRow = monthlyData[categories.indexOf(catName)] ?? [];
+    const rows: FinanceTableRow[] = view.summaries.map((cat, rowIndex) => {
+      const dataRow = view.summarySeries[rowIndex] ?? [];
       const avg = cat.transactionCount > 0 ? cat.totalAmount / cat.transactionCount : 0;
+      const codeLabel =
+        aggregation === 'group'
+          ? cat.categoryCode === UNGROUPED_CODE
+            ? '—'
+            : cat.categoryName.slice(0, 3).toUpperCase()
+          : cat.categoryCode;
       return {
         id: cat.categoryCode,
         isOdd: rowIndex % 2 !== 0,
         cells: [
-          { content: cat.categoryCode },
+          { content: codeLabel, text: codeLabel },
           {
             content: (
               <span className="flex items-center gap-2">
@@ -219,12 +287,19 @@ const MonthlyChart: React.FC<MonthlyChartProps> = ({
                 {cat.categoryName}
               </span>
             ),
+            text: cat.categoryName,
           },
-          { content: formatCellMoney(avg), align: 'right' },
-          { content: formatCellMoney(cat.totalAmount), align: 'right' },
+          { content: formatCellMoney(avg), value: avg, text: avg, align: 'right' },
+          {
+            content: formatCellMoney(cat.totalAmount),
+            value: cat.totalAmount,
+            text: cat.totalAmount,
+            align: 'right',
+          },
           ...dataRow.map((v) => ({
             content: formatCellMoney(v),
             value: v,
+            text: v,
             colorize: true,
             align: 'right' as const,
           })),
@@ -232,22 +307,29 @@ const MonthlyChart: React.FC<MonthlyChartProps> = ({
       };
     });
 
-    if (periodLabels.length > 0 && monthlyData.length > 0) {
+    if (periodLabels.length > 0 && view.summarySeries.length > 0) {
       const totals = periodLabels.map((_, i) =>
-        monthlyData.reduce((s, row) => s + (row[i] ?? 0), 0)
+        view.summarySeries.reduce((s, row) => s + (row[i] ?? 0), 0)
       );
-      const grandTotal = totals.reduce((a, b) => a + b, 0);
+      // Même total que la somme des lignes (totalAmount), pour Catégorie et Regroupement.
+      const grandTotal = view.summaries.reduce((s, cat) => s + cat.totalAmount, 0);
       rows.push({
         id: 'total',
         isTotal: true,
         cells: [
-          { content: t('financeGlobal.total'), align: 'left' },
-          { content: '' },
-          { content: '' },
-          { content: formatCellMoney(grandTotal), align: 'right' },
+          { content: t('financeGlobal.total'), text: t('financeGlobal.total'), align: 'left' },
+          { content: '', text: '' },
+          { content: '', text: '' },
+          {
+            content: formatCellMoney(grandTotal),
+            value: grandTotal,
+            text: grandTotal,
+            align: 'right',
+          },
           ...totals.map((v) => ({
             content: formatCellMoney(v),
             value: v,
+            text: v,
             colorize: true,
             align: 'right' as const,
           })),
@@ -255,25 +337,33 @@ const MonthlyChart: React.FC<MonthlyChartProps> = ({
       });
     }
     return rows;
-  }, [summaries, monthlyData, categories, periodLabels, t]);
+  }, [view, periodLabels, t, aggregation]);
 
   return (
-    <>
-      <div className="finance-global-chart-container chart-container-with-toolbar">
+    <div className="finance-chart-table-layout">
+      <div className="finance-global-chart-container chart-container-with-toolbar finance-chart-pane">
+        <div className="bilan-agg-toolbar">
+          <CategoryAggToggle value={aggregation} onChange={setAggregation} />
+        </div>
         <div className="chart active">
-          <Bar
-            ref={chartRef}
-            data={{ labels: periodLabels, datasets: [...barDatasets, lineDataset] as never }}
-            options={options}
-          />
+          <ScrollablePeriodChart granularity={granularity} labelCount={periodLabels.length}>
+            <Bar
+              ref={chartRef}
+              data={{ labels: periodLabels, datasets: [...barDatasets, lineDataset] as never }}
+              options={options}
+            />
+          </ScrollablePeriodChart>
         </div>
       </div>
       <FinanceTable
         columns={tableColumns}
         rows={tableRows}
         stickyOffsets={[0, 80, 280, 390]}
+        className="finance-table-pane"
+        exportFileName="finance_mensuel"
+        exportSheetName={t('finance.tabMonthly')}
       />
-    </>
+    </div>
   );
 };
 

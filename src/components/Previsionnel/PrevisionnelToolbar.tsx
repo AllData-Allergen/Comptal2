@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, FolderPlus, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, Copy, FolderPlus, Plus, Trash2 } from 'lucide-react';
 import { Project } from '../../types/projection';
 
 interface PrevisionnelToolbarProps {
@@ -18,6 +18,8 @@ interface PrevisionnelToolbarProps {
   onCreate: () => void;
   onDelete: () => void;
   onAddLine: () => void;
+  onFromCategory: () => void;
+  onFromTransaction: () => void;
   onAddGroup: () => void;
   onDuplicate: () => void;
   onDeleteRow: () => void;
@@ -38,11 +40,33 @@ const PrevisionnelToolbar: React.FC<PrevisionnelToolbarProps> = ({
   onCreate,
   onDelete,
   onAddLine,
+  onFromCategory,
+  onFromTransaction,
   onAddGroup,
   onDuplicate,
   onDeleteRow,
 }) => {
   const { t } = useTranslation();
+  const [lineMenuOpen, setLineMenuOpen] = useState(false);
+  const lineMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!lineMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!lineMenuRef.current?.contains(e.target as Node)) setLineMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLineMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [lineMenuOpen]);
+
+  const disabled = projectId === '';
 
   return (
     <div className="previsionnel-toolbar">
@@ -92,23 +116,79 @@ const PrevisionnelToolbar: React.FC<PrevisionnelToolbarProps> = ({
             type="button"
             className="ct-btn-danger previsionnel-sm-btn"
             onClick={onDelete}
-            disabled={projectId === ''}
+            disabled={disabled}
           >
             <Trash2 size={14} /> {t('common.delete')}
           </button>
         </div>
       </div>
       <div className="previsionnel-toolbar-row">
-        <button type="button" className="ct-btn-secondary previsionnel-sm-btn" onClick={onAddLine} disabled={projectId === ''}>
-          <Plus size={14} /> {t('previsionnel.addLine')}
-        </button>
-        <button type="button" className="ct-btn-secondary previsionnel-sm-btn" onClick={onAddGroup} disabled={projectId === ''}>
+        <div className="previsionnel-line-menu" ref={lineMenuRef}>
+          <button
+            type="button"
+            className="ct-btn-secondary previsionnel-sm-btn"
+            disabled={disabled}
+            aria-expanded={lineMenuOpen}
+            aria-haspopup="menu"
+            onClick={() => setLineMenuOpen((v) => !v)}
+          >
+            <Plus size={14} /> {t('previsionnel.newLine')}
+            <ChevronDown size={14} />
+          </button>
+          {lineMenuOpen && !disabled && (
+            <ul className="previsionnel-line-menu-list" role="menu">
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setLineMenuOpen(false);
+                    onFromCategory();
+                  }}
+                >
+                  {t('previsionnel.fromCategory.action')}
+                </button>
+              </li>
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setLineMenuOpen(false);
+                    onFromTransaction();
+                  }}
+                >
+                  {t('previsionnel.fromTransaction.action')}
+                </button>
+              </li>
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setLineMenuOpen(false);
+                    onAddLine();
+                  }}
+                >
+                  {t('previsionnel.neutralLine')}
+                </button>
+              </li>
+            </ul>
+          )}
+        </div>
+        <button type="button" className="ct-btn-secondary previsionnel-sm-btn" onClick={onAddGroup} disabled={disabled}>
           <FolderPlus size={14} /> {t('previsionnel.addGroup')}
         </button>
-        <button type="button" className="ct-btn-secondary previsionnel-sm-btn" onClick={onDuplicate} disabled={projectId === ''}>
+        <button type="button" className="ct-btn-secondary previsionnel-sm-btn" onClick={onDuplicate} disabled={disabled}>
           <Copy size={14} /> {t('previsionnel.duplicate')}
         </button>
-        <button type="button" className="ct-btn-secondary previsionnel-sm-btn" onClick={onDeleteRow} disabled={projectId === ''}>
+        <button
+          type="button"
+          className="ct-btn-secondary previsionnel-sm-btn"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onDeleteRow}
+          disabled={disabled}
+        >
           <Trash2 size={14} /> {t('previsionnel.deleteRow')}
         </button>
       </div>

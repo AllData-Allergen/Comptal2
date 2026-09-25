@@ -10,7 +10,7 @@ interface ScopeDisclaimerModalProps {
 const ScopeDisclaimerModal: React.FC<ScopeDisclaimerModalProps> = ({ isOpen, onAcknowledge }) => {
   const { t } = useTranslation();
   return (
-    <Modal isOpen={isOpen} title={t('legal.scopeTitle')} onClose={onAcknowledge}>
+    <Modal isOpen={isOpen} title={t('legal.scopeTitle')} onClose={onAcknowledge} dismissible={false}>
       <div className="flex flex-col gap-3 text-sm" style={{ color: 'var(--invoicing-gray-700)' }}>
         <p>{t('legal.scopeLead')}</p>
         <ul className="list-disc pl-5 space-y-1">

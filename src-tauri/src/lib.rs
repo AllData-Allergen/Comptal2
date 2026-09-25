@@ -38,15 +38,19 @@ pub fn run() {
             commands::delete_file,
             commands::delete_dir,
             commands::copy_dir,
+            commands::rename_dir,
             commands::write_binary_file,
             commands::resolve_data_path,
             commands::zip_dir,
             commands::unzip_to,
             commands::read_external_text_file,
             commands::write_external_text_file,
+            commands::write_external_binary_file,
             commands::read_external_dir,
             commands::external_exists,
             commands::open_path,
+            commands::seal_profile_mode,
+            commands::verify_profile_mode,
         ])
         .run(tauri::generate_context!())
         .expect("Erreur au lancement de Comptal2.1");

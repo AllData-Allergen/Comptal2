@@ -11,6 +11,9 @@ import {
 } from '../../utils/chartPastel';
 import FinanceTable, { formatCellMoney, FinanceTableColumn, FinanceTableRow } from './FinanceTable';
 import '../../utils/registerCharts';
+import { ChartGranularity } from '../../types/projection';
+import { periodXTicks } from '../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../Common/ScrollablePeriodChart';
 
 type MixedDataset = {
   label: string;
@@ -33,6 +36,7 @@ interface BalanceChartProps {
   accountColors: Record<string, string>;
   monthlyData: number[][];
   summaries: AccountSummary[];
+  granularity: ChartGranularity;
 }
 
 const BalanceChart: React.FC<BalanceChartProps> = ({
@@ -41,6 +45,7 @@ const BalanceChart: React.FC<BalanceChartProps> = ({
   accountColors,
   monthlyData,
   summaries,
+  granularity,
 }) => {
   const { t } = useTranslation();
   const chartRef = useRef<ChartJS<'bar'>>(null);
@@ -153,9 +158,7 @@ const BalanceChart: React.FC<BalanceChartProps> = ({
           stacked: true,
           grid: { display: false },
           ticks: {
-            color: chartAxisColor(isDarkMode),
-            maxRotation: 45,
-            minRotation: 45,
+            ...periodXTicks(granularity, chartAxisColor(isDarkMode)),
           },
         },
         y: {
@@ -194,7 +197,7 @@ const BalanceChart: React.FC<BalanceChartProps> = ({
         },
       },
     }),
-    [initialLimits, isDarkMode, t]
+    [initialLimits, isDarkMode, t, granularity]
   );
 
   const tableColumns: FinanceTableColumn[] = useMemo(
@@ -222,7 +225,7 @@ const BalanceChart: React.FC<BalanceChartProps> = ({
         id: String(acc.accountId),
         isOdd: rowIndex % 2 !== 0,
         cells: [
-          { content: acc.accountCode },
+          { content: acc.accountCode, text: acc.accountCode },
           {
             content: (
               <span className="flex items-center gap-2">
@@ -230,12 +233,19 @@ const BalanceChart: React.FC<BalanceChartProps> = ({
                 {acc.accountName}
               </span>
             ),
+            text: acc.accountName,
           },
-          { content: formatCellMoney(avg), align: 'right' },
-          { content: formatCellMoney(acc.balance), align: 'right' },
+          { content: formatCellMoney(avg), value: avg, text: avg, align: 'right' },
+          {
+            content: formatCellMoney(acc.balance),
+            value: acc.balance,
+            text: acc.balance,
+            align: 'right',
+          },
           ...dataRow.map((v) => ({
             content: formatCellMoney(v),
             value: v,
+            text: v,
             colorize: true,
             align: 'right' as const,
           })),
@@ -251,13 +261,19 @@ const BalanceChart: React.FC<BalanceChartProps> = ({
         id: 'total',
         isTotal: true,
         cells: [
-          { content: t('financeGlobal.total') },
-          { content: '' },
-          { content: '' },
-          { content: formatCellMoney(totals[totals.length - 1] ?? 0), align: 'right' },
+          { content: t('financeGlobal.total'), text: t('financeGlobal.total') },
+          { content: '', text: '' },
+          { content: '', text: '' },
+          {
+            content: formatCellMoney(totals[totals.length - 1] ?? 0),
+            value: totals[totals.length - 1] ?? 0,
+            text: totals[totals.length - 1] ?? 0,
+            align: 'right',
+          },
           ...totals.map((v) => ({
             content: formatCellMoney(v),
             value: v,
+            text: v,
             colorize: true,
             align: 'right' as const,
           })),
@@ -268,22 +284,27 @@ const BalanceChart: React.FC<BalanceChartProps> = ({
   }, [summaries, monthlyData, accounts, periodLabels, t]);
 
   return (
-    <>
-      <div className="finance-global-chart-container chart-container-with-toolbar">
+    <div className="finance-chart-table-layout">
+      <div className="finance-global-chart-container chart-container-with-toolbar finance-chart-pane">
         <div className="chart active">
-          <Bar
-            ref={chartRef}
-            data={{ labels: periodLabels, datasets: [...barDatasets, trendDataset] as never }}
-            options={options}
-          />
+          <ScrollablePeriodChart granularity={granularity} labelCount={periodLabels.length}>
+            <Bar
+              ref={chartRef}
+              data={{ labels: periodLabels, datasets: [...barDatasets, trendDataset] as never }}
+              options={options}
+            />
+          </ScrollablePeriodChart>
         </div>
       </div>
       <FinanceTable
         columns={tableColumns}
         rows={tableRows}
         stickyOffsets={[0, 80, 280, 390]}
+        className="finance-table-pane"
+        exportFileName="finance_solde"
+        exportSheetName={t('finance.tabBalance')}
       />
-    </>
+    </div>
   );
 };
 

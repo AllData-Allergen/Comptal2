@@ -62,6 +62,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   );
   const navigatingRef = useRef(false);
   const bootstrappedRef = useRef(false);
+  const initialTourStartedRef = useRef(false);
 
   const currentStep = tourActive ? (TOUR_STEPS[currentStepIndex] ?? null) : null;
 
@@ -86,6 +87,14 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     },
     [navigateToStep]
   );
+
+  const tryStartInitialTour = useCallback(() => {
+    if (initialTourStartedRef.current) return;
+    if (!SettingsService.current.scopeAcknowledged) return;
+    if (SettingsService.current.onboarding?.tourCompleted ?? false) return;
+    initialTourStartedRef.current = true;
+    startTour(0);
+  }, [startTour]);
 
   const completeTour = useCallback(() => {
     setTourActive(false);
@@ -166,16 +175,17 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     return SettingsService.subscribe((settings) => {
       setTourCompleted(settings.onboarding?.tourCompleted ?? false);
+      if (settings.scopeAcknowledged) {
+        tryStartInitialTour();
+      }
     });
-  }, []);
+  }, [tryStartInitialTour]);
 
   useEffect(() => {
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
-    if (!(SettingsService.current.onboarding?.tourCompleted ?? false)) {
-      startTour(0);
-    }
-  }, [startTour]);
+    tryStartInitialTour();
+  }, [tryStartInitialTour]);
 
   const value = useMemo<OnboardingContextValue>(
     () => ({

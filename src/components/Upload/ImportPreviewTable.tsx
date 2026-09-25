@@ -26,6 +26,8 @@ const ImportPreviewTable: React.FC<ImportPreviewTableProps> = ({
 }) => {
   const { t } = useTranslation();
   const shown = rows.slice(0, 50);
+  const showCategory = rows.some((r) => Boolean(r.categoryCode));
+  const showAccount = rows.some((r) => Boolean(r.accountCode));
   return (
     <div className="ct-card">
       <h2 className="ct-section-title">
@@ -36,7 +38,9 @@ const ImportPreviewTable: React.FC<ImportPreviewTableProps> = ({
           <thead className="sticky top-0" style={{ background: 'var(--invoicing-gray-50)' }}>
             <tr>
               <th>{t('upload.colDate')}</th>
+              {showAccount && <th>{t('upload.colAccount')}</th>}
               <th>{t('upload.colLabel')}</th>
+              {showCategory && <th>{t('upload.colCategory')}</th>}
               <th>{t('upload.colDebit')}</th>
               <th>{t('upload.colCredit')}</th>
             </tr>
@@ -45,7 +49,9 @@ const ImportPreviewTable: React.FC<ImportPreviewTableProps> = ({
             {shown.map((row, i) => (
               <tr key={`${row.date}-${i}`}>
                 <td>{formatFrDate(row.date)}</td>
+                {showAccount && <td>{row.accountCode || '—'}</td>}
                 <td className="max-w-xs truncate">{row.label}</td>
+                {showCategory && <td>{row.categoryCode || '—'}</td>}
                 <td style={{ color: row.debit ? 'var(--invoicing-danger)' : undefined }}>
                   {row.debit ? formatMoney(row.debit) : '—'}
                 </td>

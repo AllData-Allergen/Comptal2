@@ -11,6 +11,8 @@ import {
   dashboardTooltipOptions,
 } from '../../utils/dashboardChartTheme';
 import { chartGridCallback } from '../../utils/chartPastel';
+import { periodXTicks } from '../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../Common/ScrollablePeriodChart';
 import '../../utils/registerCharts';
 
 interface Series {
@@ -32,9 +34,6 @@ const AccountBalanceLineChart: React.FC<AccountBalanceLineChartProps> = React.me
     const isDarkMode = theme === 'dark';
     const colors = dashboardChartTheme(isDarkMode);
     const chartRef = useRef<ChartJS<'line'>>(null);
-    const tickGranularity = granularity === 'day' || granularity === 'week' || granularity === 'month'
-      ? granularity
-      : 'month';
 
     const calculateYAxisLimits = useCallback((datasets: Array<{ data: number[] }>) => {
       if (datasets.length === 0 || !datasets[0]?.data) {
@@ -97,10 +96,7 @@ const AccountBalanceLineChart: React.FC<AccountBalanceLineChartProps> = React.me
               color: colors.grid,
             },
             ticks: {
-              color: colors.text,
-              maxRotation: tickGranularity === 'day' ? 45 : 0,
-              minRotation: tickGranularity === 'day' ? 45 : 0,
-              font: { size: 11 },
+              ...periodXTicks(granularity, colors.text),
             },
           },
           y: {
@@ -164,7 +160,7 @@ const AccountBalanceLineChart: React.FC<AccountBalanceLineChartProps> = React.me
           },
         },
       }),
-      [initialLimits, calculateYAxisLimits, isDarkMode, colors, tickGranularity, t]
+      [initialLimits, calculateYAxisLimits, isDarkMode, colors, granularity, t]
     );
 
     if (labels.length === 0 || series.length === 0) {
@@ -177,7 +173,9 @@ const AccountBalanceLineChart: React.FC<AccountBalanceLineChartProps> = React.me
 
     return (
       <div className="chart-canvas-wrap" style={{ width: '100%', height: '100%' }}>
-        <Line ref={chartRef} data={{ labels, datasets }} options={options} />
+        <ScrollablePeriodChart granularity={granularity} labelCount={labels.length}>
+          <Line ref={chartRef} data={{ labels, datasets }} options={options} />
+        </ScrollablePeriodChart>
       </div>
     );
   }

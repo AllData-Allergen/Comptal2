@@ -391,15 +391,21 @@ html.dark .export-button {
 }
 
 .dashboard-reminder.is-urgent {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
+  border-color: var(--invoicing-urgent-border);
+  background: var(--invoicing-urgent-bg);
+  color: var(--invoicing-urgent-text);
 }
 
 .dashboard-reminder.is-warn {
-  border-color: #fde68a;
-  background: #fffbeb;
-  color: #b45309;
+  border-color: var(--invoicing-warn-border);
+  background: var(--invoicing-warn-bg);
+  color: var(--invoicing-warn-text);
+}
+
+.dashboard-reminder.is-urgent p,
+.dashboard-reminder.is-warn p {
+  color: inherit;
+  opacity: 0.9;
 }
 
 .dashboard-reminder.is-info {
@@ -802,8 +808,50 @@ html.dark .chart-container h2 {
   flex: 1;
   min-height: 420px;
   display: flex;
+  flex-direction: column;
   align-items: stretch;
-  justify-content: center;
+  justify-content: stretch;
+  min-width: 0;
+}
+
+.chart-x-scroll {
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+  min-width: 0;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--invoicing-gray-400) transparent;
+}
+
+.chart-x-scroll.is-day {
+  padding-bottom: 4px;
+}
+
+.chart-x-scroll-inner {
+  height: 100%;
+  min-height: 280px;
+  width: 100%;
+  position: relative;
+}
+
+.chart-x-scroll-inner > div {
+  height: 100% !important;
+}
+
+.chart-x-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.chart-x-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chart-x-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--invoicing-gray-400);
+  border-radius: 8px;
 }
 
 .chart-container-line .chart-canvas-wrap {
@@ -900,6 +948,19 @@ html.dark .dashboard-explain-meta {
 
 .dashboard-mini-section {
   margin-bottom: 16px;
+}
+
+.dashboard-mini-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-mini-section-header .dashboard-mini-section-title {
+  margin: 0;
 }
 
 .dashboard-mini-section-title {

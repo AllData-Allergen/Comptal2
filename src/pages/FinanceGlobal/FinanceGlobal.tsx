@@ -2,12 +2,15 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
-import { Loader2, Upload } from 'lucide-react';
+import { Loader2, Upload, SearchX } from 'lucide-react';
 import { Account, Category } from '../../types/models';
 import { ChartGranularity } from '../../types/projection';
-import { DEFAULT_FINANCE_TABS, FinanceTabConfig, FinanceTabId } from '../../types/finance';
+import { DEFAULT_FINANCE_TABS, FinanceTabConfig, FinanceTabId, financePresetForUsage, isFinanceTabAllowedForMode } from '../../types/finance';
 import { DashboardInsights } from '../../types/dashboard';
 import { ConfigService } from '../../services/ConfigService';
+import { ProfileService } from '../../services/ProfileService';
+import { SettingsService } from '../../services/SettingsService';
+import { parseUsageMode } from '../../utils/usageMode';
 import {
   autoGranularity,
   AccountSummary,
@@ -36,6 +39,9 @@ import BilanTab from '../../components/FinanceGlobal/BilanTab';
 import FacturationTab from '../../components/FinanceGlobal/FacturationTab';
 import DonsTab from '../../components/FinanceGlobal/DonsTab';
 import ContactsTab from '../../components/FinanceGlobal/ContactsTab';
+import AmortissementChart from '../../components/FinanceGlobal/AmortissementChart';
+import { AmortissementService } from '../../services/AmortissementService';
+import { AmortissementSeries } from '../../types/amortissement';
 
 const EMPTY_PERIODS: DistinctPeriods = { weeks: [], months: [], years: [] };
 
@@ -69,6 +75,8 @@ const FinanceGlobalPage: React.FC = () => {
   const [bilanLoading, setBilanLoading] = useState(false);
   const [insights, setInsights] = useState<DashboardInsights>(EMPTY_DASHBOARD_INSIGHTS);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  const [amortissementSeries, setAmortissementSeries] = useState<AmortissementSeries | null>(null);
+  const [amortissementLoading, setAmortissementLoading] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -81,9 +89,30 @@ const FinanceGlobalPage: React.FC = () => {
           StatsService.distinctPeriods(),
           FinanceSettingsService.load(),
         ]);
-        setTabConfig(savedTabs);
-        setTabDraft(savedTabs);
-        const firstVisible = savedTabs.find((item) => item.visible);
+        // Adapte les graphiques visibles au mode du profil (familiale/tpe/association) en gardant la sélection possible
+        let adaptedTabs = savedTabs;
+        try {
+          const profiles = await ProfileService.list();
+          const activeId = SettingsService.current.activeProfileId;
+          const active = profiles.find((p) => p.id === activeId);
+          const mode = parseUsageMode(active?.usageMode, 'tpe');
+          const preset = financePresetForUsage(mode);
+          const isDefault = savedTabs.length === preset.length && savedTabs.every((t) => t.visible);
+          if (isDefault) {
+            adaptedTabs = preset;
+          } else {
+            adaptedTabs = savedTabs.map((tab) => ({
+              ...tab,
+              visible: tab.visible && isFinanceTabAllowedForMode(tab.id, mode),
+            }));
+          }
+          void FinanceSettingsService.save(adaptedTabs).catch(() => undefined);
+        } catch {
+          // ignore mode adaptation
+        }
+        setTabConfig(adaptedTabs);
+        setTabDraft(adaptedTabs);
+        const firstVisible = adaptedTabs.find((item) => item.visible);
         if (firstVisible) setTab(firstVisible.id);
         setAccounts(acc);
         setCategories(cat);
@@ -149,7 +178,6 @@ const FinanceGlobalPage: React.FC = () => {
       setBalancePoints(bals);
       setCategorySummaries(catSum);
       setAccountSummaries(accSum);
-      setHasAnyData(catSum.length > 0 || accSum.length > 0);
     } catch (err) {
       Logger.error('Finance.load', err);
     } finally {
@@ -207,9 +235,33 @@ const FinanceGlobalPage: React.FC = () => {
       .finally(() => setInsightsLoading(false));
   }, [tab, buildFilters, granularity, dateStart, dateEnd]);
 
+  useEffect(() => {
+    if (tab !== 'amortissement') return;
+    if (!dateStart || !dateEnd) return;
+    setAmortissementLoading(true);
+    void AmortissementService.buildAmortissementSeries(granularity, dateStart, dateEnd)
+      .then(setAmortissementSeries)
+      .catch((err) => {
+        Logger.error('Finance.amortissement', err);
+        setAmortissementSeries(null);
+      })
+      .finally(() => setAmortissementLoading(false));
+  }, [tab, granularity, dateStart, dateEnd]);
+
   const visibleTabs = useMemo(
     () => tabConfig.filter((item) => item.visible).sort((a, b) => a.order - b.order),
     [tabConfig]
+  );
+
+  const filteredEmpty = useMemo(
+    () =>
+      !isLoading &&
+      hasAnyData &&
+      categorySummaries.length === 0 &&
+      accountSummaries.length === 0 &&
+      monthlyPoints.length === 0 &&
+      balancePoints.length === 0,
+    [isLoading, hasAnyData, categorySummaries, accountSummaries, monthlyPoints, balancePoints]
   );
 
   useEffect(() => {
@@ -250,7 +302,31 @@ const FinanceGlobalPage: React.FC = () => {
         return hit?.net ?? 0;
       })
     );
-    return { periodLabels, periodKeys, catNames, categoryColors, monthlyData };
+    const incomeData = categorySummaries.map((cat) =>
+      periodKeys.map((period) => {
+        const hit = monthlyPoints.find(
+          (p) => p.period === period && p.categoryCode === cat.categoryCode
+        );
+        return hit?.income ?? 0;
+      })
+    );
+    const expensesData = categorySummaries.map((cat) =>
+      periodKeys.map((period) => {
+        const hit = monthlyPoints.find(
+          (p) => p.period === period && p.categoryCode === cat.categoryCode
+        );
+        return hit?.expenses ?? 0;
+      })
+    );
+    return {
+      periodLabels,
+      periodKeys,
+      catNames,
+      categoryColors,
+      monthlyData,
+      incomeData,
+      expensesData,
+    };
   }, [monthlyPoints, categorySummaries, granularity]);
 
   const balanceChartData = useMemo(() => {
@@ -339,9 +415,21 @@ const FinanceGlobalPage: React.FC = () => {
 
         <ChartTabs tabs={tabConfig} active={tab} onChange={setTab} />
 
-        {isLoading || (insightsLoading && (tab === 'facturation' || tab === 'dons' || tab === 'contacts')) ? (
+        {isLoading ||
+        (insightsLoading && (tab === 'facturation' || tab === 'dons' || tab === 'contacts')) ||
+        (amortissementLoading && tab === 'amortissement') ? (
           <div className="finance-loading">
             <Loader2 size={28} className="animate-spin" />
+          </div>
+        ) : filteredEmpty && tab !== 'amortissement' ? (
+          <div className="finance-empty-inline">
+            <SearchX size={48} strokeWidth={1.5} style={{ color: 'var(--invoicing-gray-400)' }} />
+            <h3 style={{ margin: '8px 0 4px', color: 'var(--invoicing-gray-700)' }}>
+              {t('edition.noResultsTitle')}
+            </h3>
+            <p style={{ color: 'var(--invoicing-gray-500)', margin: 0 }}>
+              {t('edition.noResults')}
+            </p>
           </div>
         ) : (
           <>
@@ -353,7 +441,11 @@ const FinanceGlobalPage: React.FC = () => {
                   categories={monthlyChartData.catNames}
                   categoryColors={monthlyChartData.categoryColors}
                   monthlyData={monthlyChartData.monthlyData}
+                  incomeData={monthlyChartData.incomeData}
+                  expensesData={monthlyChartData.expensesData}
                   summaries={categorySummaries}
+                  categoryConfigs={categories}
+                  granularity={granularity}
                 />
               )}
 
@@ -366,6 +458,7 @@ const FinanceGlobalPage: React.FC = () => {
                   accountColors={balanceChartData.accountColors}
                   monthlyData={balanceChartData.monthlyData}
                   summaries={accountSummaries}
+                  granularity={granularity}
                 />
               )}
 
@@ -381,9 +474,14 @@ const FinanceGlobalPage: React.FC = () => {
             )}
 
             {tab === 'bilan' && <BilanTab data={bilanData} loading={bilanLoading} />}
-            {tab === 'facturation' && <FacturationTab data={insights.invoicing} />}
-            {tab === 'dons' && <DonsTab data={insights.association} />}
+            {tab === 'facturation' && (
+              <FacturationTab data={insights.invoicing} granularity={granularity} />
+            )}
+            {tab === 'dons' && <DonsTab data={insights.association} granularity={granularity} />}
             {tab === 'contacts' && <ContactsTab data={insights.contacts} />}
+            {tab === 'amortissement' && (
+              <AmortissementChart series={amortissementSeries} granularity={granularity} />
+            )}
           </>
         )}
       </div>

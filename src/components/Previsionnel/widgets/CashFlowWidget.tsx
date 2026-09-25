@@ -13,6 +13,9 @@ import {
 } from '../../../utils/chartPastel';
 import { getPeriodLabel } from '../../../utils/periodKeys';
 import { ChartGranularity } from '../../../types/projection';
+import { periodXTicks } from '../../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../../Common/ScrollablePeriodChart';
+import PrevisionnelChartFrame from '../PrevisionnelChartFrame';
 import '../../../utils/registerCharts';
 
 interface CashFlowWidgetProps {
@@ -20,6 +23,7 @@ interface CashFlowWidgetProps {
   granularity: ChartGranularity;
 }
 
+/** Barres débits/crédits + courbe du flux net, agrégés selon la granularité choisie. */
 const CashFlowWidget: React.FC<CashFlowWidgetProps> = ({ aggregates, granularity }) => {
   const { t } = useTranslation();
   const { theme } = useTheme();
@@ -87,22 +91,24 @@ const CashFlowWidget: React.FC<CashFlowWidgetProps> = ({ aggregates, granularity
         },
       },
       scales: {
-        x: { ticks: { color: axis, maxRotation: 0 }, grid: { color: grid } },
+        x: { ticks: { ...periodXTicks(granularity, axis) }, grid: { color: grid } },
         y: {
           ticks: { color: axis, callback: (value) => formatMoney(Number(value)) },
           grid: { color: grid },
         },
       },
     }),
-    [axis, grid, tooltip]
+    [axis, grid, tooltip, granularity]
   );
 
   if (aggregates.periods.length === 0) return <p className="previsionnel-empty-chart">—</p>;
 
   return (
-    <div className="previsionnel-chart-h">
-      <Bar data={data} options={options} />
-    </div>
+    <PrevisionnelChartFrame>
+      <ScrollablePeriodChart granularity={granularity} labelCount={labels.length}>
+        <Bar data={data} options={options} />
+      </ScrollablePeriodChart>
+    </PrevisionnelChartFrame>
   );
 };
 

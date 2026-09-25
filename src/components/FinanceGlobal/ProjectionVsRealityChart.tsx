@@ -10,6 +10,9 @@ import {
   chartTooltipTheme,
 } from '../../utils/chartPastel';
 import '../../utils/registerCharts';
+import { ChartGranularity } from '../../types/projection';
+import { periodXTicks } from '../../utils/chartPeriodAxis';
+import ScrollablePeriodChart from '../Common/ScrollablePeriodChart';
 
 /** Crée un motif hachuré diagonal (même couleur que les data, lignes claires pour distinguer) */
 function createHatchingPattern(
@@ -51,6 +54,7 @@ interface ProjectionVsRealityChartProps {
   realityByCategory: number[][];
   projectionByCategory: Record<string, number[]>;
   categoryLabels?: Record<string, string>;
+  granularity: ChartGranularity;
 }
 
 const ProjectionVsRealityChart: React.FC<ProjectionVsRealityChartProps> = ({
@@ -60,6 +64,7 @@ const ProjectionVsRealityChart: React.FC<ProjectionVsRealityChartProps> = ({
   realityByCategory,
   projectionByCategory,
   categoryLabels = {},
+  granularity,
 }) => {
   const { t } = useTranslation();
   const chartRef = useRef<ChartJS<'bar'>>(null);
@@ -218,13 +223,11 @@ const ProjectionVsRealityChart: React.FC<ProjectionVsRealityChartProps> = ({
             display: false,
           },
           ticks: {
+            ...periodXTicks(granularity, chartAxisColor(isDarkMode)),
             font: {
               size: 11,
               weight: 'bold',
             },
-            color: chartAxisColor(isDarkMode),
-            maxRotation: 45,
-            minRotation: 45,
           },
         },
         y: {
@@ -279,20 +282,22 @@ const ProjectionVsRealityChart: React.FC<ProjectionVsRealityChartProps> = ({
         },
       },
     }),
-    [yAxisLimits, isDarkMode, t]
+    [yAxisLimits, isDarkMode, t, granularity]
   );
 
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%', gap: 16 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <Bar
-          ref={chartRef}
-          data={{
-            labels: monthLabels,
-            datasets: chartDataWithHidden,
-          }}
-          options={options}
-        />
+        <ScrollablePeriodChart granularity={granularity} labelCount={monthLabels.length}>
+          <Bar
+            ref={chartRef}
+            data={{
+              labels: monthLabels,
+              datasets: chartDataWithHidden,
+            }}
+            options={options}
+          />
+        </ScrollablePeriodChart>
       </div>
 
       <div

@@ -32,7 +32,7 @@
 | Prévisionnel | `#/previsionnel` | [prévisionnel](./pages/previsionnel.md) | [flux](./cartes/previsionnel.md) |
 | Contacts | `#/clients` | [contacts](./pages/contacts.md) | [flux](./cartes/contacts.md) |
 | Facturation | `#/facturation` | [facturation](./pages/facturation.md) | [flux](./cartes/facturation.md) |
-| Dons | `#/dons` | [association](./pages/association.md) | [flux](./cartes/association.md) |
+| Dons | `#/dons` | [dons](./pages/dons.md) | [flux](./cartes/dons.md) |
 | Registre | `#/registre` | [registre](./pages/registre.md) | [flux](./cartes/registre.md) |
 | Paramètres | `#/parametre` | [paramètres](./pages/parametre.md) | [flux](./cartes/parametre.md) |
 
