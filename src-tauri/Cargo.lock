@@ -590,7 +590,7 @@ dependencies = [
 
 [[package]]
 name = "comptal21"
-version = "2.1.2"
+version = "2.1.3"
 dependencies = [
  "chrono",
  "hex",
