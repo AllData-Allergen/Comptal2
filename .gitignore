@@ -21,3 +21,5 @@ src-tauri/keys/
 _updater_work/
 *.local
 .DS_Store
+
+scripts/agent-api/test/fixture-profil/
