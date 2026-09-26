@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Info, RefreshCw, DownloadCloud, Shield } from 'lucide-react';
+import { Info, RefreshCw, DownloadCloud, Shield, Terminal } from 'lucide-react';
 import { Update } from '@tauri-apps/plugin-updater';
 import { Logger } from '../../services/logger';
 import {
@@ -22,7 +22,7 @@ type UpdateState =
 
 const AboutTab: React.FC = () => {
   const { t } = useTranslation();
-  const version = Logger.session?.appVersion ?? '2.1.2';
+  const version = Logger.session?.appVersion ?? '2.1.3';
   const [state, setState] = useState<UpdateState>({ phase: 'idle' });
 
   const handleCheck = async () => {
@@ -90,6 +90,62 @@ const AboutTab: React.FC = () => {
             <li>{t('legal.scopeItemNotCash')}</li>
             <li>{t('legal.scopeItemNotPa')}</li>
           </ul>
+        </div>
+      </section>
+
+      <section className="ct-card">
+        <h3 className="ct-section-title flex items-center gap-2">
+          <Terminal size={20} /> {t('settings.about.agentApiTitle')}
+        </h3>
+        <div className="flex flex-col gap-3 text-sm" style={{ color: 'var(--invoicing-gray-700)' }}>
+          <p>{t('settings.about.agentApiIntro')}</p>
+          <p className="ct-hint">{t('settings.about.agentApiAudience')}</p>
+          <div>
+            <p className="font-semibold mb-1">{t('settings.about.agentApiHttpTitle')}</p>
+            <ol className="list-decimal pl-5 space-y-1">
+              <li>{t('settings.about.agentApiHttpStep1')}</li>
+              <li>{t('settings.about.agentApiHttpStep2')}</li>
+              <li>{t('settings.about.agentApiHttpStep3')}</li>
+            </ol>
+            <pre
+              className="mt-2 p-3 rounded text-xs overflow-x-auto font-mono"
+              style={{
+                backgroundColor: 'var(--invoicing-gray-100)',
+                color: 'var(--invoicing-gray-800)',
+              }}
+            >
+              {t('settings.about.agentApiHttpSnippet')}
+            </pre>
+          </div>
+          <div>
+            <p className="font-semibold mb-1">{t('settings.about.agentApiMcpTitle')}</p>
+            <p>{t('settings.about.agentApiMcpHint')}</p>
+            <pre
+              className="mt-2 p-3 rounded text-xs overflow-x-auto font-mono"
+              style={{
+                backgroundColor: 'var(--invoicing-gray-100)',
+                color: 'var(--invoicing-gray-800)',
+              }}
+            >
+              {t('settings.about.agentApiMcpSnippet')}
+            </pre>
+          </div>
+          <div>
+            <p className="font-semibold mb-1">{t('settings.about.agentApiEndpointsTitle')}</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>{t('settings.about.agentApiEndpointHealth')}</li>
+              <li>{t('settings.about.agentApiEndpointProfiles')}</li>
+              <li>{t('settings.about.agentApiEndpointMatches')}</li>
+              <li>{t('settings.about.agentApiEndpointLink')}</li>
+            </ul>
+          </div>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>{t('settings.about.agentApiSecurityLocal')}</li>
+            <li>{t('settings.about.agentApiSecurityToken')}</li>
+            <li>{t('settings.about.agentApiSecurityReadonly')}</li>
+            <li>{t('settings.about.agentApiSecurityDataRoot')}</li>
+          </ul>
+          <p className="ct-hint">{t('settings.about.agentApiDocHint')}</p>
         </div>
       </section>
 
