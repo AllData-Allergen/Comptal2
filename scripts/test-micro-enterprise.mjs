@@ -151,7 +151,49 @@ assert.deepEqual(
 );
 
 const app = fs.readFileSync(path.join(root, 'src/App.tsx'), 'utf8');
-assert.match(app, /path="\/micro-entreprise"/, 'La route micro-entreprise doit être enregistrée');
+assert.match(
+  app,
+  /path="\/micro-entreprise"\s+element=\{<Navigate to="\/facturation"/,
+  'L’ancienne route micro doit rediriger vers Facturation'
+);
+assert.doesNotMatch(
+  app,
+  /pages\/MicroEntreprise/,
+  'La micro-entreprise ne doit plus avoir de page dédiée'
+);
+const facturationSource = fs.readFileSync(
+  path.join(root, 'src/pages/Facturation/Facturation.tsx'),
+  'utf8'
+);
+assert.match(
+  facturationSource,
+  /MicroReceiptBookPanel/,
+  'Facturation doit accueillir la gestion du livre des recettes'
+);
+const registerSource = fs.readFileSync(path.join(root, 'src/pages/Register/Register.tsx'), 'utf8');
+assert.match(
+  registerSource,
+  /MicroRegisterGenerationPanel/,
+  'Registre doit accueillir la génération du livre des recettes'
+);
+const dashboardSource = fs.readFileSync(
+  path.join(root, 'src/components/Dashboard/DashboardSummaryPanel.tsx'),
+  'utf8'
+);
+assert.match(
+  dashboardSource,
+  /MicroDashboardDetails/,
+  'Le tableau de bord doit afficher les seuils et échéances micro'
+);
+const forecastSource = fs.readFileSync(
+  path.join(root, 'src/pages/Previsionnel/Previsionnel.tsx'),
+  'utf8'
+);
+assert.match(
+  forecastSource,
+  /createForecastProvision/,
+  'Prévisionnel doit proposer la provision micro-entreprise'
+);
 const exportsSource = fs.readFileSync(path.join(root, 'src/services/ExportService.ts'), 'utf8');
 assert.match(exportsSource, /exportMicroReceiptsCsv/, 'L’export CSV du livre doit être disponible');
 assert.match(exportsSource, /exportMicroReceiptsExcel/, 'L’export Excel du livre doit être disponible');
@@ -178,7 +220,13 @@ console.log(
       },
       invoiceFranchiseValidation: true,
       exports: ['csv', 'xlsx', 'pdf'],
-      route: '/micro-entreprise',
+      distribution: {
+        facturation: 'livre des recettes',
+        register: 'generation',
+        dashboard: 'seuils et echeances',
+        forecast: 'provision',
+      },
+      legacyRoute: '/micro-entreprise -> /facturation',
     },
     null,
     2

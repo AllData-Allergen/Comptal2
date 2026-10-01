@@ -23,7 +23,6 @@ const ClientPage = lazy(() => import('./pages/Client/Client'));
 const Association = lazy(() => import('./pages/Association/Association'));
 const Register = lazy(() => import('./pages/Register/Register'));
 const Amortissement = lazy(() => import('./pages/Amortissement/Amortissement'));
-const MicroEntreprise = lazy(() => import('./pages/MicroEntreprise/MicroEntreprise'));
 
 const MenuVisibleRoute: React.FC<{ page: keyof MenuVisibility; children: React.ReactNode }> = ({
   page,
@@ -90,7 +89,7 @@ const AppRoutes: React.FC = () => {
           </MenuVisibleRoute>
         }
       />
-      <Route path="/micro-entreprise" element={<MicroEntreprise />} />
+      <Route path="/micro-entreprise" element={<Navigate to="/facturation" replace />} />
       <Route path="/parametre" element={<Parametre />} />
     </Routes>
   );

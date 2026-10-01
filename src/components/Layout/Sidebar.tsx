@@ -12,7 +12,6 @@ import {
   HeartHandshake,
   BookOpenCheck,
   Landmark,
-  BriefcaseBusiness,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -22,7 +21,6 @@ import { MenuVisibility } from '../../types/settings';
 import { SettingsService } from '../../services/SettingsService';
 import { ProfileService } from '../../services/ProfileService';
 import { Logger } from '../../services/logger';
-import { UsageMode, parseUsageMode } from '../../utils/usageMode';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -34,7 +32,6 @@ interface MenuItem {
   icon: LucideIcon;
   labelKey: string;
   visibilityKey: keyof MenuVisibility | null;
-  tpeOnly?: boolean;
 }
 
 const ALL_MENU_ITEMS: MenuItem[] = [
@@ -48,7 +45,6 @@ const ALL_MENU_ITEMS: MenuItem[] = [
   { path: '/dons', icon: HeartHandshake, labelKey: 'navigation.association', visibilityKey: 'association' },
   { path: '/registre', icon: BookOpenCheck, labelKey: 'navigation.register', visibilityKey: 'register' },
   { path: '/amortissement', icon: Landmark, labelKey: 'navigation.amortissement', visibilityKey: 'amortissement' },
-  { path: '/micro-entreprise', icon: BriefcaseBusiness, labelKey: 'navigation.microEnterprise', visibilityKey: null, tpeOnly: true },
   { path: '/parametre', icon: Settings, labelKey: 'navigation.settings', visibilityKey: null },
 ];
 
@@ -76,7 +72,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
   });
 
   const [profileName, setProfileName] = useState('');
-  const [usageMode, setUsageMode] = useState<UsageMode>('tpe');
 
   useEffect(() => {
     return SettingsService.subscribe((settings) => setMenuVisibility(settings.menuVisibility));
@@ -87,16 +82,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
       const profiles = await ProfileService.list();
       const active = profiles.find((profile) => profile.id === SettingsService.current.activeProfileId);
       setProfileName(active?.name ?? '');
-      setUsageMode(parseUsageMode(active?.usageMode, 'tpe'));
     };
     void refresh();
     return SettingsService.subscribe(() => void refresh());
   }, []);
 
   const menuItems = ALL_MENU_ITEMS.filter(
-    (item) =>
-      (!item.tpeOnly || usageMode === 'tpe') &&
-      (item.visibilityKey === null || menuVisibility[item.visibilityKey])
+    (item) => item.visibilityKey === null || menuVisibility[item.visibilityKey]
   );
 
   return (

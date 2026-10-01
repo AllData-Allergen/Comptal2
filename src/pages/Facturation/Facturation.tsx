@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, Boxes, ReceiptText } from 'lucide-react';
+import { FileText, Boxes, ReceiptText, BookOpenCheck } from 'lucide-react';
 import DocumentsPanel from '../../components/Facturation/DocumentsPanel';
 import PostesPanel from '../../components/Facturation/PostesPanel';
+import MicroReceiptBookPanel from '../../components/MicroEnterprise/MicroReceiptBookPanel';
+import { MicroEnterpriseService } from '../../services/MicroEnterpriseService';
 import '../../styles/facturation-custom.css';
 import '../../styles/organization-custom.css';
 
 const Facturation: React.FC = () => {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<'docs' | 'postes'>('docs');
+  const [tab, setTab] = useState<'docs' | 'postes' | 'receipts'>('docs');
+  const [microEnabled, setMicroEnabled] = useState(false);
+
+  useEffect(() => {
+    void MicroEnterpriseService.isEnabled().then(setMicroEnabled);
+  }, []);
 
   return (
     <div className="inv-page">
@@ -35,8 +42,19 @@ const Facturation: React.FC = () => {
         >
           <Boxes size={16} /> {t('facturation.tabPostes')}
         </button>
+        {microEnabled && (
+          <button
+            type="button"
+            className={tab === 'receipts' ? 'active' : ''}
+            onClick={() => setTab('receipts')}
+          >
+            <BookOpenCheck size={16} /> Livre des recettes
+          </button>
+        )}
       </div>
-      {tab === 'docs' ? <DocumentsPanel /> : <PostesPanel kind="facturation" />}
+      {tab === 'docs' && <DocumentsPanel />}
+      {tab === 'postes' && <PostesPanel kind="facturation" />}
+      {tab === 'receipts' && microEnabled && <MicroReceiptBookPanel />}
     </div>
   );
 };

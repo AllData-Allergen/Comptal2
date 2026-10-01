@@ -20,8 +20,10 @@ import {
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
 import ConfirmModal from '../../components/Common/ConfirmModal';
+import MicroRegisterGenerationPanel from '../../components/MicroEnterprise/MicroRegisterGenerationPanel';
 import RegisterTypeEnableList from '../../components/Register/RegisterTypeEnableList';
 import { Logger } from '../../services/logger';
+import { MicroEnterpriseService } from '../../services/MicroEnterpriseService';
 import { RegisterPDFService } from '../../services/RegisterPDFService';
 import { RegisterService } from '../../services/RegisterService';
 import {
@@ -92,6 +94,7 @@ const Register: React.FC = () => {
   const [item, setItem] = useState({ label: '', description: '', amount: '' });
   const [link, setLink] = useState({ label: '', value: '', url: '' });
   const [showTypeSettings, setShowTypeSettings] = useState(false);
+  const [microEnabled, setMicroEnabled] = useState(false);
 
   const load = async (selectId?: string) => {
     const [nextDocuments, attachments] = await Promise.all([
@@ -106,6 +109,7 @@ const Register: React.FC = () => {
 
   useEffect(() => {
     void load().catch(() => toast.error(t('register.loadFail')));
+    void MicroEnterpriseService.isEnabled().then(setMicroEnabled);
     void RegisterService.loadSettings()
       .then((settings) => {
         const enabled = RegisterService.enabledTypes(settings);
@@ -281,6 +285,8 @@ const Register: React.FC = () => {
           <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" onChange={(event) => void attach(null, event.target.files)} />
         </label>
       </header>
+
+      {microEnabled && <MicroRegisterGenerationPanel />}
 
       <div className="register-layout">
         <aside className="register-launcher">

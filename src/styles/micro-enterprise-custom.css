@@ -5,6 +5,17 @@
   padding-bottom: 24px;
 }
 
+.micro-panel,
+.micro-receipts-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.micro-receipts-panel {
+  padding-bottom: 18px;
+}
+
 .micro-header {
   display: flex;
   justify-content: space-between;
@@ -48,6 +59,11 @@
   background: #fffbeb;
   color: #78350f;
   font-size: 0.875rem;
+}
+
+.micro-scope .ct-btn-secondary {
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .micro-threshold-alert {
@@ -107,7 +123,9 @@
   gap: 18px;
 }
 
-.micro-page h2 {
+.micro-page h2,
+.micro-panel h2,
+.micro-register-generation h2 {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -115,6 +133,10 @@
   color: var(--invoicing-gray-900);
   font-size: 1rem;
   font-weight: 700;
+}
+
+.micro-dashboard-details {
+  margin-top: 14px;
 }
 
 .micro-thresholds {
@@ -271,10 +293,74 @@
   text-align: center;
 }
 
+.micro-register-generation {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 110px auto auto;
+  gap: 18px;
+  align-items: end;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--invoicing-gray-200);
+  border-radius: 12px;
+  background: var(--invoicing-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.micro-register-generation h2 {
+  margin: 2px 0 4px;
+}
+
+.micro-register-generation p {
+  margin: 0;
+  color: var(--invoicing-gray-600);
+  font-size: 0.82rem;
+}
+
+.micro-register-generation > label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--invoicing-gray-700);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.micro-register-generation input {
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid var(--invoicing-gray-300);
+  border-radius: 7px;
+  background: var(--invoicing-surface);
+  color: var(--invoicing-gray-900);
+}
+
+.micro-register-stats {
+  display: flex;
+  flex-direction: column;
+  min-width: 105px;
+}
+
+.micro-register-stats span {
+  color: var(--invoicing-gray-500);
+  font-size: 0.75rem;
+}
+
+.micro-register-stats strong {
+  color: var(--invoicing-gray-900);
+}
+
 @media (max-width: 1100px) {
   .micro-kpis,
   .micro-receipt-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .micro-register-generation {
+    grid-template-columns: 1fr 120px auto;
+  }
+
+  .micro-register-generation .micro-export-actions {
+    grid-column: 1 / -1;
   }
 }
 
@@ -292,5 +378,15 @@
 
   .micro-receipt-form label.wide {
     grid-column: auto;
+  }
+
+  .micro-scope,
+  .micro-register-generation {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .micro-scope .ct-btn-secondary {
+    margin-left: 0;
   }
 }

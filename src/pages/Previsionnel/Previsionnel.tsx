@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'react-toastify';
-import { Loader2 } from 'lucide-react';
+import { CalendarClock, Loader2 } from 'lucide-react';
 import { Category } from '../../types/models';
 import {
   DEFAULT_SUBSCRIPTION_COLOR,
@@ -26,6 +26,7 @@ import {
 } from '../../services/ForecastModel';
 import { Logger } from '../../services/logger';
 import { Db } from '../../services/db';
+import { MicroEnterpriseService } from '../../services/MicroEnterpriseService';
 import { parseAmount } from '../../utils/amounts';
 import {
   defaultForecastRange,
@@ -113,6 +114,7 @@ const PrevisionnelPage: React.FC = () => {
   const [fromTransactionOpen, setFromTransactionOpen] = useState(false);
   const [dialogParentId, setDialogParentId] = useState<number | null>(null);
   const [discardEditNonce, setDiscardEditNonce] = useState(0);
+  const [microEnabled, setMicroEnabled] = useState(false);
   const saveTimer = useRef<number | null>(null);
   /** Invalide les refreshTree / patch en vol après une suppression. */
   const treeMutationSeq = useRef(0);
@@ -204,6 +206,10 @@ const PrevisionnelPage: React.FC = () => {
   }, [loadProject, t]);
 
   useEffect(() => {
+    void MicroEnterpriseService.isEnabled().then(setMicroEnabled);
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
     };
@@ -255,6 +261,18 @@ const PrevisionnelPage: React.FC = () => {
     } catch (err) {
       Logger.error('Previsionnel.create', err);
       toast.error(t('common.error'));
+    }
+  };
+
+  const handleMicroProvision = async () => {
+    try {
+      const id = await MicroEnterpriseService.createForecastProvision();
+      await loadList(id);
+      await loadProject(id);
+      toast.success('Prévisionnel de cotisations micro-entreprise prêt');
+    } catch (err) {
+      Logger.error('Previsionnel.createMicroProvision', err);
+      toast.error('Création de la provision micro-entreprise impossible');
     }
   };
 
@@ -563,8 +581,19 @@ const PrevisionnelPage: React.FC = () => {
   return (
     <div className="previsionnel-page">
       <header className="previsionnel-header">
-        <h1 data-tour="page-intro-anchor">{t('previsionnel.title')}</h1>
-        <p>{t('previsionnel.subtitle')}</p>
+        <div>
+          <h1 data-tour="page-intro-anchor">{t('previsionnel.title')}</h1>
+          <p>{t('previsionnel.subtitle')}</p>
+        </div>
+        {microEnabled && (
+          <button
+            type="button"
+            className="ct-btn-secondary"
+            onClick={() => void handleMicroProvision()}
+          >
+            <CalendarClock size={16} /> Créer / ouvrir la provision micro
+          </button>
+        )}
       </header>
 
       <PrevisionnelToolbar

@@ -27,6 +27,7 @@ import MiniAccountCards from './MiniAccountCards';
 import MiniCategoryCards from './MiniCategoryCards';
 import TopCategoriesList from './TopCategoriesList';
 import DashboardLegalReminders from './DashboardLegalReminders';
+import MicroDashboardDetails from '../MicroEnterprise/MicroDashboardDetails';
 
 interface DashboardSummaryPanelProps {
   kpis: KpiStats;
@@ -254,6 +255,7 @@ const DashboardSummaryPanel: React.FC<DashboardSummaryPanelProps> = ({
               <div className="secondary-kpi-value">{micro.vatBaseProgress.toFixed(1)} %</div>
             </div>
           </div>
+          <MicroDashboardDetails summary={micro} />
         </section>
       )}
 
