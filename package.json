@@ -24,7 +24,7 @@
     "tauri:ios:init": "tauri ios init",
     "tauri:ios:build": "tauri ios build",
     "agent-api:mcp-smoke": "node --experimental-sqlite scripts/agent-api/test/mcp-smoke.mjs",
-    "micro:test": "node --experimental-sqlite scripts/test-micro-enterprise.mjs"
+    "micro:test": "node --experimental-sqlite --experimental-strip-types scripts/test-micro-enterprise.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

@@ -1,7 +1,5 @@
-import { addMonths, endOfMonth, format, isAfter, parseISO } from 'date-fns';
 import { Facture, Paiement } from '../types/invoice';
 import {
-  MicroDeadline,
   MicroEnterpriseConfig,
   MicroEnterpriseSummary,
   MicroReceipt,
@@ -14,6 +12,11 @@ import { Db } from './db';
 import { InvoiceService } from './InvoiceService';
 import { loadSingletonJson, saveSingletonJson } from './jsonStore';
 import { withLog } from './logger';
+import {
+  buildMicroDeadlines,
+  calculateMicroSummary,
+  contributionRate,
+} from './microEnterpriseCalculations';
 import { ProjectService } from './ProjectService';
 
 interface ReceiptRow {
@@ -201,21 +204,6 @@ async function paymentClientAndDescription(facture: Facture): Promise<{
   return { clientName, description };
 }
 
-function contributionRate(config: MicroEnterpriseConfig): number {
-  return config.socialRate + config.trainingRate + (config.versementLiberatoire ? config.incomeTaxRate : 0);
-}
-
-function progress(value: number, threshold: number): number {
-  return threshold > 0 ? (value / threshold) * 100 : 0;
-}
-
-function warningLevel(value: number): 0 | 75 | 90 | 100 {
-  if (value >= 100) return 100;
-  if (value >= 90) return 90;
-  if (value >= 75) return 75;
-  return 0;
-}
-
 export const MicroEnterpriseService = {
   async loadConfig(): Promise<MicroEnterpriseConfig | null> {
     const raw = await loadSingletonJson<Partial<MicroEnterpriseConfig>>('micro_enterprise_config');
@@ -368,106 +356,12 @@ export const MicroEnterpriseService = {
       this.listReceipts(start, end),
       this.listReceipts(`${year}-01-01`, `${year}-12-31`),
     ]);
-    const periodCollected = roundMoney(periodReceipts.reduce((sum, item) => sum + item.amount, 0));
-    const yearCollected = roundMoney(yearReceipts.reduce((sum, item) => sum + item.amount, 0));
-    const socialContributions = roundMoney(periodCollected * (config.socialRate / 100));
-    const trainingContribution = roundMoney(periodCollected * (config.trainingRate / 100));
-    const incomeTaxProvision = config.versementLiberatoire
-      ? roundMoney(periodCollected * (config.incomeTaxRate / 100))
-      : 0;
-    const totalProvision = roundMoney(periodCollected * (contributionRate(config) / 100));
-    const months = Math.max(
-      1,
-      (Number(end.slice(0, 4)) - Number(start.slice(0, 4))) * 12 +
-        Number(end.slice(5, 7)) -
-        Number(start.slice(5, 7)) +
-        1
-    );
-    const toolsCost = roundMoney(config.estimatedMonthlyToolsCost * months);
-    const microThresholdProgress = progress(yearCollected, config.microThreshold);
-    const vatBaseProgress = progress(yearCollected, config.vatBaseThreshold);
-    const vatToleranceProgress = progress(yearCollected, config.vatToleranceThreshold);
-    return {
-      periodStart: start,
-      periodEnd: end,
-      periodCollected,
-      yearCollected,
-      socialContributions,
-      trainingContribution,
-      incomeTaxProvision,
-      totalProvision,
-      toolsCost,
-      estimatedRemainder: roundMoney(periodCollected - totalProvision - toolsCost),
-      microThresholdProgress,
-      vatBaseProgress,
-      vatToleranceProgress,
-      warningLevel: warningLevel(Math.max(microThresholdProgress, vatBaseProgress)),
-    };
+    return calculateMicroSummary(config, periodReceipts, yearReceipts, start, end);
   },
 
-  async upcomingDeadlines(from = new Date()): Promise<MicroDeadline[]> {
+  async upcomingDeadlines(from = new Date()) {
     const config = await this.loadConfigSafe();
-    const deadlines: MicroDeadline[] = [];
-    const fromIso = format(from, 'yyyy-MM-dd');
-    if (config.declarationFrequency === 'monthly') {
-      for (let offset = 0; offset < 12; offset += 1) {
-        const period = addMonths(from, offset);
-        const due = endOfMonth(addMonths(period, 1));
-        deadlines.push({
-          id: `urssaf-${format(period, 'yyyy-MM')}`,
-          date: format(due, 'yyyy-MM-dd'),
-          label: `Déclaration URSSAF — ${format(period, 'MM/yyyy')}`,
-          detail: "Déclarer le chiffre d'affaires encaissé, même s'il est nul.",
-          kind: 'urssaf',
-        });
-      }
-    } else {
-      const year = from.getFullYear();
-      for (const [date, label] of [
-        [`${year}-04-30`, '1er trimestre'],
-        [`${year}-07-31`, '2e trimestre'],
-        [`${year}-10-31`, '3e trimestre'],
-        [`${year + 1}-01-31`, '4e trimestre'],
-        [`${year + 1}-04-30`, '1er trimestre'],
-      ]) {
-        if (date >= fromIso) {
-          deadlines.push({
-            id: `urssaf-${date}`,
-            date,
-            label: `Déclaration URSSAF — ${label}`,
-            detail: "Déclarer le chiffre d'affaires encaissé, même s'il est nul.",
-            kind: 'urssaf',
-          });
-        }
-      }
-    }
-    const taxYear = from.getFullYear() + 1;
-    deadlines.push(
-      {
-        id: `tax-${taxYear}`,
-        date: `${taxYear}-05-31`,
-        label: 'Déclaration 2042-C-PRO',
-        detail: "Date indicative : vérifier l'échéance affichée sur impots.gouv.fr.",
-        kind: 'tax',
-      },
-      {
-        id: `cfe-${from.getFullYear()}`,
-        date: `${from.getFullYear()}-12-31`,
-        label: 'Déclaration initiale CFE 1447-C-SD',
-        detail: "À déposer avant la fin de l'année de création.",
-        kind: 'cfe',
-      },
-      {
-        id: 'einvoicing-2027',
-        date: '2027-09-01',
-        label: 'Facturation électronique B2B',
-        detail: "Prévoir une plateforme agréée ; le PDF seul n'est pas une facture électronique réglementaire.",
-        kind: 'einvoicing',
-      }
-    );
-    return deadlines
-      .filter((item) => !isAfter(parseISO(fromIso), parseISO(item.date)))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    return buildMicroDeadlines(config, from);
   },
 
   async createForecastProvision(): Promise<number> {

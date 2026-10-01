@@ -1,4 +1,4 @@
-import { Client, Emetteur, EmetteurExtended, Facture, PosteFacture } from '../types/invoice';
+import type { Client, Emetteur, EmetteurExtended, Facture, PosteFacture } from '../types/invoice';
 
 export function snapshotVendeur(emetteur: Emetteur | EmetteurExtended) {
   return {
