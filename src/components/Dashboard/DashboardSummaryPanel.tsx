@@ -13,6 +13,8 @@ import {
   TrendingDown,
   Users,
   Wallet,
+  BriefcaseBusiness,
+  Gauge,
 } from 'lucide-react';
 import { Account, Category } from '../../types/models';
 import { AccountBalance, CategoryTotal, KpiStats } from '../../services/StatsService';
@@ -61,6 +63,7 @@ const DashboardSummaryPanel: React.FC<DashboardSummaryPanelProps> = ({
   const inv = insights.invoicing;
   const asso = insights.association;
   const contacts = insights.contacts;
+  const micro = insights.micro;
 
   const totalWealth = useMemo(
     () => accBalances.reduce((sum, a) => sum + a.balance, 0),
@@ -224,6 +227,34 @@ const DashboardSummaryPanel: React.FC<DashboardSummaryPanelProps> = ({
             </button>
           </div>
         </>
+      )}
+
+      {micro && (
+        <section className="dashboard-mini-section">
+          <p className="dashboard-mini-section-title">
+            <BriefcaseBusiness size={14} /> Micro-entreprise — encaissements
+          </p>
+          <div className="dashboard-secondary-kpis">
+            <div className="secondary-kpi-card">
+              <span className="secondary-kpi-label">CA encaissé sur la période</span>
+              <div className="secondary-kpi-value">{formatMoney(micro.periodCollected)}</div>
+            </div>
+            <div className="secondary-kpi-card">
+              <span className="secondary-kpi-label">Cotisations à provisionner</span>
+              <div className="secondary-kpi-value">{formatMoney(micro.totalProvision)}</div>
+            </div>
+            <div className="secondary-kpi-card">
+              <span className="secondary-kpi-label">Reste estimé avant autres impôts</span>
+              <div className="secondary-kpi-value">{formatMoney(micro.estimatedRemainder)}</div>
+            </div>
+            <div className="secondary-kpi-card">
+              <span className="secondary-kpi-label">
+                <Gauge size={14} /> Franchise TVA
+              </span>
+              <div className="secondary-kpi-value">{micro.vatBaseProgress.toFixed(1)} %</div>
+            </div>
+          </div>
+        </section>
       )}
 
       {summary.invoicingKpis && (

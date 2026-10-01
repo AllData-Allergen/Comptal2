@@ -7,6 +7,7 @@ import { withLog } from './logger';
 import { ConfigService } from './ConfigService';
 import { EditionService } from './EditionService';
 import { EmetteurService } from './EmetteurService';
+import { MicroEnterpriseService } from './MicroEnterpriseService';
 
 export type PaymentMatchReason = 'label' | 'amount' | 'both';
 
@@ -84,6 +85,7 @@ export const PaymentTrackingService = {
       facture.paiements = [...facture.paiements, paiement];
       facture.statut = this.computeFactureStatus(facture);
       await InvoiceService.upsertFacture(facture);
+      await MicroEnterpriseService.recordInvoicePayment(facture, paiement);
       return facture;
     });
   },
@@ -130,6 +132,7 @@ export const PaymentTrackingService = {
       facture.paiements = [...facture.paiements, paiement];
       facture.statut = this.computeFactureStatus(facture);
       await InvoiceService.upsertFacture(facture);
+      await MicroEnterpriseService.recordInvoicePayment(facture, paiement);
       return facture;
     });
   },
@@ -139,9 +142,11 @@ export const PaymentTrackingService = {
       const factures = await InvoiceService.loadFactures();
       const facture = factures.find((item) => item.id === factureId);
       if (!facture) throw new Error(i18n.t('errors.invoiceNotFound'));
+      const paiement = facture.paiements.find((item) => item.id === paiementId);
       facture.paiements = facture.paiements.filter((p) => p.id !== paiementId);
       facture.statut = this.computeFactureStatus(facture);
       await InvoiceService.upsertFacture(facture);
+      if (paiement) await MicroEnterpriseService.reverseInvoicePayment(paiement);
       return facture;
     });
   },

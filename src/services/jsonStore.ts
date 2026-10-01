@@ -5,6 +5,7 @@ const JSON_STORE_TABLES = new Set([
   'invoice_emetteur',
   'invoice_settings',
   'association_config',
+  'micro_enterprise_config',
 ]);
 
 function assertJsonTable(table: string): string {

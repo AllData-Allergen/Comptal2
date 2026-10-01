@@ -2,6 +2,7 @@ import { Client, Emetteur, EmetteurExtended, Facture, PosteFacture } from '../ty
 
 export function snapshotVendeur(emetteur: Emetteur | EmetteurExtended) {
   return {
+    type: emetteur.type,
     denominationSociale: emetteur.denominationSociale,
     formeJuridique: emetteur.formeJuridique ?? '',
     adresse: emetteur.adresse,
@@ -14,9 +15,34 @@ export function snapshotVendeur(emetteur: Emetteur | EmetteurExtended) {
     telephone: emetteur.telephone,
     regimeTVA: emetteur.regimeTVA,
     mentionFranchiseTVA: emetteur.mentionFranchiseTVA,
+    mediateurConsommation: emetteur.mediateurConsommation,
     logo: emetteur.logo,
     coordonneesBancaires: emetteur.coordonneesBancaires,
   };
+}
+
+export function legalIssuerName(emetteur: Pick<Emetteur, 'type' | 'denominationSociale'>): string {
+  const name = emetteur.denominationSociale.trim();
+  if (emetteur.type !== 'auto_entrepreneur' || /\bEI\b/i.test(name)) return name;
+  return `${name} EI`.trim();
+}
+
+export function operationNature(postes: PosteFacture[]): string {
+  const kinds = new Set(postes.map((poste) => poste.type));
+  if (kinds.size > 1) return 'Livraisons de biens et prestations de services';
+  if (kinds.has('materiel')) return 'Livraisons de biens';
+  return 'Prestations de services';
+}
+
+export function validateMicroInvoice(facture: Facture, emetteur: Emetteur): string[] {
+  if (emetteur.type !== 'auto_entrepreneur') return [];
+  const errors: string[] = [];
+  if (emetteur.regimeTVA === 'franchise' && facture.postes.some((poste) => (poste.tauxTVA ?? 0) !== 0)) {
+    errors.push('Une micro-entreprise en franchise de TVA doit facturer toutes les lignes à 0 % de TVA.');
+  }
+  if (!emetteur.siren?.trim()) errors.push('Le SIREN est obligatoire.');
+  if (!emetteur.siret?.trim()) errors.push('Le SIRET est obligatoire.');
+  return errors;
 }
 
 export function isInvoiceIssued(facture: Facture): boolean {
@@ -93,8 +119,13 @@ export function tvaBreakdownLines(totalTVA: Record<number, number>): string[] {
 }
 
 /** Mentions minimales TPE (B2B) — toujours présentes, même « néant ». */
-export function mandatoryInvoiceMentions(emetteur: Emetteur, extraSelected = ''): string {
+export function mandatoryInvoiceMentions(
+  emetteur: Emetteur,
+  extraSelected = '',
+  facture?: Facture
+): string {
   const lines: string[] = [];
+  if (facture) lines.push(`Nature de l’opération : ${operationNature(facture.postes)}.`);
   if (emetteur.regimeTVA === 'franchise') {
     lines.push(emetteur.mentionFranchiseTVA?.trim() || 'TVA non applicable, art. 293 B du CGI');
   }
@@ -105,6 +136,9 @@ export function mandatoryInvoiceMentions(emetteur: Emetteur, extraSelected = '')
     'Indemnité forfaitaire de recouvrement de 40 € due de plein droit en cas de retard (art. D. 441-5 du Code de commerce) — opérations entre professionnels.'
   );
   lines.push('Escompte pour paiement anticipé : néant.');
+  if (emetteur.mediateurConsommation?.trim()) {
+    lines.push(`Médiateur de la consommation : ${emetteur.mediateurConsommation.trim()}.`);
+  }
   if (extraSelected.trim()) lines.push(extraSelected.trim());
   return lines.join('\n');
 }

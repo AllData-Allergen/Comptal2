@@ -5,7 +5,7 @@ import i18n from '../i18n/config';
 import { Logger, withLog } from './logger';
 import { assertSafeProfileId } from '../utils/security';
 
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 const SCHEMA_V1: string[] = [
   `CREATE TABLE IF NOT EXISTS accounts (
@@ -372,6 +372,45 @@ const SCHEMA_V17: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_immo_attachments_immo ON immobilisation_attachments(immobilisation_id)`,
 ];
 
+const SCHEMA_V18: string[] = [
+  `CREATE TABLE IF NOT EXISTS micro_enterprise_config (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    payload TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS micro_receipts (
+    id TEXT PRIMARY KEY,
+    sequence INTEGER NOT NULL UNIQUE CHECK(sequence > 0),
+    received_date TEXT NOT NULL,
+    client_name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    amount REAL NOT NULL CHECK(amount != 0),
+    payment_method TEXT NOT NULL CHECK(payment_method IN (
+      'virement','cheque','especes','cb','prelevement','autre'
+    )),
+    invoice_id TEXT,
+    invoice_number TEXT,
+    transaction_id TEXT,
+    source_payment_id TEXT UNIQUE,
+    reference TEXT,
+    source TEXT NOT NULL CHECK(source IN ('invoice_payment','manual','reversal')),
+    reverses_id TEXT REFERENCES micro_receipts(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_micro_receipts_date ON micro_receipts(received_date, sequence)`,
+  `CREATE INDEX IF NOT EXISTS idx_micro_receipts_invoice ON micro_receipts(invoice_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_micro_receipts_transaction ON micro_receipts(transaction_id)`,
+  `CREATE TRIGGER IF NOT EXISTS micro_receipts_no_update
+    BEFORE UPDATE ON micro_receipts
+    BEGIN
+      SELECT RAISE(ABORT, 'Le livre des recettes est inaltérable');
+    END`,
+  `CREATE TRIGGER IF NOT EXISTS micro_receipts_no_delete
+    BEFORE DELETE ON micro_receipts
+    BEGIN
+      SELECT RAISE(ABORT, 'Le livre des recettes est inaltérable');
+    END`,
+];
+
 let db: Database | null = null;
 let currentProfileId: string | null = null;
 let transactionQueue: Promise<void> = Promise.resolve();
@@ -412,6 +451,7 @@ async function ensureSchema(database: Database): Promise<void> {
     ...SCHEMA_V15,
     ...SCHEMA_V16,
     ...SCHEMA_V17,
+    ...SCHEMA_V18,
   ]) {
     await database.execute(statement);
   }

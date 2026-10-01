@@ -37,6 +37,7 @@ export interface Emetteur {
   regimeTVA: 'franchise' | 'reel_simplifie' | 'reel_normal' | 'mini_reel';
   regimeFiscal?: 'micro_bic' | 'micro_bnc' | 'reel_simplifie' | 'reel_normal' | 'is';
   mentionFranchiseTVA?: string;
+  mediateurConsommation?: string;
   assurancePro?: {
     compagnie: string;
     numeroPolice: string;
@@ -194,6 +195,7 @@ export interface DocumentBase {
   dateEcheance?: Date;
   postes: PosteFacture[];
   vendeur: {
+    type?: TypeEmetteur;
     denominationSociale: string;
     formeJuridique: string;
     adresse: Adresse;
@@ -206,6 +208,7 @@ export interface DocumentBase {
     telephone?: string;
     regimeTVA?: Emetteur['regimeTVA'];
     mentionFranchiseTVA?: string;
+    mediateurConsommation?: string;
     logo?: string;
     coordonneesBancaires?: {
       titulaire: string;

@@ -72,6 +72,7 @@ function reviveEmetteur(raw: Partial<Emetteur> | null | undefined): Emetteur {
     regimeTVA: raw?.regimeTVA ?? 'franchise',
     regimeFiscal: raw?.regimeFiscal,
     mentionFranchiseTVA: raw?.mentionFranchiseTVA,
+    mediateurConsommation: raw?.mediateurConsommation,
     assurancePro: raw?.assurancePro,
     createdAt: parseDateOrNow(raw?.createdAt),
     updatedAt: parseDateOrNow(raw?.updatedAt),

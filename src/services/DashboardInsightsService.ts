@@ -24,6 +24,7 @@ import { RegisterService } from './RegisterService';
 import { Db } from './db';
 import { withLog } from './logger';
 import { ASSOCIATION_REGISTER_TYPES, RegisterDocumentType } from '../types/register';
+import { MicroEnterpriseService } from './MicroEnterpriseService';
 
 const DONOR_PALETTE = [
   '#1e3a8a',
@@ -696,6 +697,7 @@ export const DashboardInsightsService = {
           association: emptyAssociation(labels),
           contacts: EMPTY_DASHBOARD_INSIGHTS.contacts,
           reminders: [],
+          micro: null,
         };
       }
       const accountFilterActive = filters.accountIds !== undefined;
@@ -750,8 +752,11 @@ export const DashboardInsightsService = {
       const contacts = include.contacts || include.reminders
         ? buildContacts(clients, devis, factures, donations, filters)
         : EMPTY_DASHBOARD_INSIGHTS.contacts;
+      const micro = (await MicroEnterpriseService.isEnabled().catch(() => false))
+        ? await MicroEnterpriseService.summary(filters.dateStart, filters.dateEnd).catch(() => null)
+        : null;
       if (!include.reminders) {
-        return { invoicing, association, contacts, reminders: [] };
+        return { invoicing, association, contacts, reminders: [], micro };
       }
       const year = (filters.dateEnd ?? toIsoDate(new Date())).slice(0, 4);
       const yearKinds = registerDocs
@@ -786,7 +791,7 @@ export const DashboardInsightsService = {
         );
       }
 
-      return { invoicing, association, contacts, reminders };
+      return { invoicing, association, contacts, reminders, micro };
     });
   },
 };
@@ -805,4 +810,5 @@ export const EMPTY_DASHBOARD_INSIGHTS: DashboardInsights = {
     unused: 0,
   },
   reminders: [],
+  micro: null,
 };

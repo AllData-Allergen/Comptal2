@@ -11,6 +11,11 @@ import { Logger } from '../../services/logger';
 import { Account } from '../../types/models';
 import { FORMES_JURIDIQUES } from '../../constants/invoicingConstants';
 import SuggestInput, { SuggestItem } from '../Common/SuggestInput';
+import { MicroEnterpriseConfig } from '../../types/microEnterprise';
+import {
+  defaultMicroEnterpriseConfig,
+  MicroEnterpriseService,
+} from '../../services/MicroEnterpriseService';
 
 const IdentityCompanyPanel: React.FC = () => {
   const { t } = useTranslation();
@@ -19,14 +24,30 @@ const IdentityCompanyPanel: React.FC = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [sireneQ, setSireneQ] = useState('');
   const [saving, setSaving] = useState(false);
+  const [microConfig, setMicroConfig] = useState<MicroEnterpriseConfig | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const loaded = await EmetteurService.loadEmetteurExtended();
+        const [loaded, loadedMicro] = await Promise.all([
+          EmetteurService.loadEmetteurExtended(),
+          MicroEnterpriseService.loadConfig(),
+        ]);
+        setMicroConfig(loadedMicro);
         if (loaded) {
           setEmetteur(loaded);
           setSettings(await EmetteurService.loadInvoiceSettingsSafe(loaded));
+        } else if (loadedMicro?.enabled) {
+          const microEmetteur: EmetteurExtended = {
+            ...defaultEmetteur(),
+            type: 'auto_entrepreneur',
+            formeJuridique: 'EI',
+            regimeTVA: 'franchise',
+            regimeFiscal: loadedMicro.regimeFiscal,
+            mentionFranchiseTVA: 'TVA non applicable, art. 293 B du CGI',
+          };
+          setEmetteur(microEmetteur);
+          setSettings({ ...defaultInvoiceSettings(microEmetteur), tauxTVADefaut: 0 });
         }
         setAccounts(await ConfigService.listAccounts());
       } catch (err) {
@@ -122,6 +143,7 @@ const IdentityCompanyPanel: React.FC = () => {
     try {
       await EmetteurService.saveEmetteurExtended(emetteur);
       await EmetteurService.saveInvoiceSettings({ ...settings, emetteur });
+      if (microConfig) await MicroEnterpriseService.saveConfig(microConfig);
       toast.success(t('org.saved'));
     } catch (err) {
       Logger.error('IdentityCompanyPanel.save', err);
@@ -147,7 +169,23 @@ const IdentityCompanyPanel: React.FC = () => {
             <span>{t('org.type')}</span>
             <select
               value={emetteur.type}
-              onChange={(e) => patch({ type: e.target.value as EmetteurExtended['type'] })}
+              onChange={(e) => {
+                const type = e.target.value as EmetteurExtended['type'];
+                if (type === 'auto_entrepreneur') {
+                  const config = microConfig ?? defaultMicroEnterpriseConfig();
+                  setMicroConfig(config);
+                  patch({
+                    type,
+                    formeJuridique: 'EI',
+                    regimeTVA: 'franchise',
+                    regimeFiscal: config.regimeFiscal,
+                    mentionFranchiseTVA: 'TVA non applicable, art. 293 B du CGI',
+                  });
+                  setSettings((prev) => ({ ...prev, tauxTVADefaut: 0 }));
+                } else {
+                  patch({ type });
+                }
+              }}
             >
               <option value="entreprise">{t('org.typeEntreprise')}</option>
               <option value="auto_entrepreneur">{t('org.typeAe')}</option>
@@ -237,6 +275,179 @@ const IdentityCompanyPanel: React.FC = () => {
             />
           </label>
         </div>
+
+        {emetteur.type === 'auto_entrepreneur' && microConfig && (
+          <>
+            <h3 className="org-section-title">Régime micro-entreprise</h3>
+            <div className="org-grid">
+              <label className="org-field">
+                <span>Date de début d’activité</span>
+                <input
+                  type="date"
+                  value={microConfig.businessStartDate}
+                  onChange={(e) => setMicroConfig({ ...microConfig, businessStartDate: e.target.value })}
+                />
+              </label>
+              <label className="org-field">
+                <span>Régime fiscal</span>
+                <select
+                  value={microConfig.regimeFiscal}
+                  onChange={(e) => {
+                    const regimeFiscal = e.target.value as MicroEnterpriseConfig['regimeFiscal'];
+                    setMicroConfig({ ...microConfig, regimeFiscal });
+                    patch({ regimeFiscal });
+                  }}
+                >
+                  <option value="micro_bnc">Micro-BNC — prestations intellectuelles</option>
+                  <option value="micro_bic">Micro-BIC — prestations commerciales</option>
+                </select>
+              </label>
+              <label className="org-field">
+                <span>Année des taux et seuils</span>
+                <input
+                  type="number"
+                  min="2020"
+                  max="2100"
+                  value={microConfig.fiscalYear}
+                  onChange={(e) => setMicroConfig({ ...microConfig, fiscalYear: Number(e.target.value) })}
+                />
+              </label>
+              <label className="org-field">
+                <span>Déclaration URSSAF</span>
+                <select
+                  value={microConfig.declarationFrequency}
+                  onChange={(e) =>
+                    setMicroConfig({
+                      ...microConfig,
+                      declarationFrequency: e.target.value as MicroEnterpriseConfig['declarationFrequency'],
+                    })
+                  }
+                >
+                  <option value="quarterly">Trimestrielle</option>
+                  <option value="monthly">Mensuelle</option>
+                </select>
+              </label>
+              <label className="org-field">
+                <span>Régime de TVA</span>
+                <select
+                  value={emetteur.regimeTVA}
+                  onChange={(e) => {
+                    const regimeTVA = e.target.value as EmetteurExtended['regimeTVA'];
+                    patch({ regimeTVA });
+                    if (regimeTVA === 'franchise') {
+                      setSettings((prev) => ({ ...prev, tauxTVADefaut: 0 }));
+                    }
+                  }}
+                >
+                  <option value="franchise">Franchise en base de TVA</option>
+                  <option value="reel_simplifie">Réel simplifié</option>
+                  <option value="reel_normal">Réel normal</option>
+                  <option value="mini_reel">Mini-réel</option>
+                </select>
+              </label>
+              <label className="org-field full">
+                <span>Mention de franchise TVA</span>
+                <input
+                  value={emetteur.mentionFranchiseTVA ?? ''}
+                  onChange={(e) => patch({ mentionFranchiseTVA: e.target.value })}
+                />
+              </label>
+              <label className="org-field full">
+                <span>Médiateur de la consommation (si clients particuliers)</span>
+                <input
+                  value={emetteur.mediateurConsommation ?? ''}
+                  onChange={(e) => patch({ mediateurConsommation: e.target.value })}
+                  placeholder="Nom, adresse et site du médiateur"
+                />
+              </label>
+              <label className="org-field">
+                <span>Taux de cotisations sociales (%)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={microConfig.socialRate}
+                  onChange={(e) => setMicroConfig({ ...microConfig, socialRate: Number(e.target.value) })}
+                />
+              </label>
+              <label className="org-field">
+                <span>Contribution formation CFP (%)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={microConfig.trainingRate}
+                  onChange={(e) => setMicroConfig({ ...microConfig, trainingRate: Number(e.target.value) })}
+                />
+              </label>
+              <label className="org-field">
+                <span>Plafond micro annuel (€)</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={microConfig.microThreshold}
+                  onChange={(e) => setMicroConfig({ ...microConfig, microThreshold: Number(e.target.value) })}
+                />
+              </label>
+              <label className="org-field">
+                <span>Seuil de franchise TVA (€)</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={microConfig.vatBaseThreshold}
+                  onChange={(e) => setMicroConfig({ ...microConfig, vatBaseThreshold: Number(e.target.value) })}
+                />
+              </label>
+              <label className="org-field">
+                <span>Seuil majoré de TVA (€)</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={microConfig.vatToleranceThreshold}
+                  onChange={(e) =>
+                    setMicroConfig({ ...microConfig, vatToleranceThreshold: Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label className="org-field">
+                <span>Outils mensuels estimés (€)</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={microConfig.estimatedMonthlyToolsCost}
+                  onChange={(e) =>
+                    setMicroConfig({ ...microConfig, estimatedMonthlyToolsCost: Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label className="org-field">
+                <span>Taux du versement libératoire (%)</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={microConfig.incomeTaxRate}
+                  onChange={(e) =>
+                    setMicroConfig({ ...microConfig, incomeTaxRate: Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm full">
+                <input
+                  type="checkbox"
+                  checked={microConfig.versementLiberatoire}
+                  onChange={(e) =>
+                    setMicroConfig({ ...microConfig, versementLiberatoire: e.target.checked })
+                  }
+                />
+                Versement libératoire de l’impôt ({microConfig.incomeTaxRate.toFixed(1)} %)
+              </label>
+            </div>
+            <p className="ct-hint">
+              Les taux et seuils restent modifiables : vérifiez-les chaque année sur les sites officiels.
+            </p>
+          </>
+        )}
 
         <h3 className="org-section-title">{t('org.sirene')}</h3>
         <div className="flex gap-2">

@@ -279,7 +279,44 @@ CREATE INDEX idx_register_items_document ON register_items(document_id);
 CREATE INDEX idx_register_links_document ON register_links(document_id);
 CREATE INDEX idx_register_attachments_document ON register_attachments(document_id);
 
-PRAGMA user_version = 9;
+CREATE TABLE micro_enterprise_config (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  payload TEXT NOT NULL
+);
+CREATE TABLE micro_receipts (
+  id TEXT PRIMARY KEY,
+  sequence INTEGER NOT NULL UNIQUE CHECK(sequence > 0),
+  received_date TEXT NOT NULL,
+  client_name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  amount REAL NOT NULL CHECK(amount != 0),
+  payment_method TEXT NOT NULL CHECK(payment_method IN (
+    'virement','cheque','especes','cb','prelevement','autre'
+  )),
+  invoice_id TEXT,
+  invoice_number TEXT,
+  transaction_id TEXT,
+  source_payment_id TEXT UNIQUE,
+  reference TEXT,
+  source TEXT NOT NULL CHECK(source IN ('invoice_payment','manual','reversal')),
+  reverses_id TEXT REFERENCES micro_receipts(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_micro_receipts_date ON micro_receipts(received_date, sequence);
+CREATE INDEX idx_micro_receipts_invoice ON micro_receipts(invoice_id);
+CREATE INDEX idx_micro_receipts_transaction ON micro_receipts(transaction_id);
+CREATE TRIGGER micro_receipts_no_update
+  BEFORE UPDATE ON micro_receipts
+  BEGIN
+    SELECT RAISE(ABORT, 'Le livre des recettes est inaltérable');
+  END;
+CREATE TRIGGER micro_receipts_no_delete
+  BEFORE DELETE ON micro_receipts
+  BEGIN
+    SELECT RAISE(ABORT, 'Le livre des recettes est inaltérable');
+  END;
+
+PRAGMA user_version = 18;
 """
 
 
@@ -360,6 +397,118 @@ def enrich_for_kind(
     Le kind ``mixte`` reste inchangé : c’est le contrat des tests automatisés.
     """
     if kind == "mixte":
+        return
+
+    if kind == "micro":
+        emetteur = _load_singleton(connection, "invoice_emetteur")
+        emetteur.update(
+            {
+                "type": "auto_entrepreneur",
+                "denominationSociale": "Léopaul VOGT EI",
+                "formeJuridique": "EI",
+                "numeroTVA": "",
+                "regimeTVA": "franchise",
+                "regimeFiscal": "micro_bnc",
+                "mentionFranchiseTVA": "TVA non applicable, art. 293 B du CGI",
+            }
+        )
+        _save_singleton(connection, "invoice_emetteur", emetteur)
+        invoice_settings = _load_singleton(connection, "invoice_settings")
+        invoice_settings["tauxTVADefaut"] = 0
+        _save_singleton(connection, "invoice_settings", invoice_settings)
+        config = {
+            "enabled": True,
+            "businessStartDate": "2026-10-01",
+            "fiscalYear": 2026,
+            "regimeFiscal": "micro_bnc",
+            "declarationFrequency": "quarterly",
+            "versementLiberatoire": False,
+            "socialRate": 25.6,
+            "trainingRate": 0.2,
+            "incomeTaxRate": 2.2,
+            "microThreshold": 83600,
+            "vatBaseThreshold": 37500,
+            "vatToleranceThreshold": 41250,
+            "estimatedMonthlyToolsCost": 40,
+        }
+        connection.execute(
+            "INSERT INTO micro_enterprise_config (id, payload) VALUES (1, ?)",
+            (json_text(config),),
+        )
+        for code, name, color in (
+            ("RECETTES_PRO", "Recettes professionnelles", "#16a34a"),
+            ("COTISATIONS", "Cotisations sociales", "#dc2626"),
+            ("CFP", "Contribution formation professionnelle", "#ea580c"),
+            ("CFE", "Cotisation foncière des entreprises", "#7c3aed"),
+            ("OUTILS", "Outils et abonnements", "#2563eb"),
+        ):
+            connection.execute(
+                "INSERT OR IGNORE INTO categories (code, name, color) VALUES (?, ?, ?)",
+                (code, name, color),
+            )
+        invoice_rows = connection.execute("SELECT id, payload FROM factures").fetchall()
+        first_payment: tuple[str, dict[str, object], dict[str, object]] | None = None
+        for invoice_id, raw in invoice_rows:
+            invoice = json.loads(raw)
+            invoice["vendeur"] = {
+                **invoice.get("vendeur", {}),
+                "type": "auto_entrepreneur",
+                "denominationSociale": "Léopaul VOGT EI",
+                "formeJuridique": "EI",
+                "numeroTVA": "",
+                "regimeTVA": "franchise",
+                "mentionFranchiseTVA": "TVA non applicable, art. 293 B du CGI",
+            }
+            for line in invoice.get("postes", []):
+                line["tauxTVA"] = 0
+            invoice["totalTVA"] = {"0": 0}
+            invoice["totalTTC"] = invoice.get("totalHT", invoice.get("totalTTC", 0))
+            connection.execute(
+                "UPDATE factures SET payload = ? WHERE id = ?",
+                (json_text(invoice), invoice_id),
+            )
+            payments = invoice.get("paiements", [])
+            if first_payment is None and payments:
+                first_payment = (invoice_id, invoice, payments[0])
+        if first_payment:
+            invoice_id, invoice, payment = first_payment
+            connection.execute(
+                """INSERT INTO micro_receipts
+                   (id, sequence, received_date, client_name, description, amount,
+                    payment_method, invoice_id, invoice_number, transaction_id,
+                    source_payment_id, reference, source, created_at)
+                   VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'invoice_payment', ?)""",
+                (
+                    "micro-rec-fixture-1",
+                    str(payment.get("datePaiement", "2026-06-15"))[:10],
+                    "Client de démonstration",
+                    "Prestation informatique de démonstration",
+                    payment.get("montant", 0),
+                    payment.get("modePaiement", "virement"),
+                    invoice_id,
+                    invoice.get("numero", ""),
+                    payment.get("transactionId"),
+                    payment.get("id", "fixture-payment"),
+                    payment.get("reference"),
+                    NOW,
+                ),
+            )
+        connection.execute(
+            """INSERT INTO micro_receipts
+               (id, sequence, received_date, client_name, description, amount,
+                payment_method, reference, source, created_at)
+               VALUES (?, 2, ?, ?, ?, ?, ?, ?, 'manual', ?)""",
+            (
+                "micro-rec-fixture-2",
+                "2026-07-03",
+                "Client comptant",
+                "Assistance administrative ponctuelle",
+                95,
+                "cb",
+                "REC-MANUELLE-001",
+                NOW,
+            ),
+        )
         return
 
     if kind == "entreprise":
@@ -607,7 +756,7 @@ def seed_database(
     profile_id: str,
     kind: str = "mixte",
 ) -> dict[str, int]:
-    if kind not in {"mixte", "entreprise", "association"}:
+    if kind not in {"mixte", "entreprise", "association", "micro"}:
         raise ValueError(f"kind invalide: {kind}")
     connection.executescript(SCHEMA_SQL)
 
@@ -1359,14 +1508,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--profile-name", default="Développement Comptal2.1")
     parser.add_argument(
         "--kind",
-        choices=("mixte", "entreprise", "association"),
+        choices=("mixte", "entreprise", "association", "micro"),
         default="mixte",
-        help="Scénario : mixte (défaut, tests), entreprise ou association.",
+        help="Scénario : mixte (défaut, tests), entreprise, association ou micro.",
     )
     parser.add_argument(
         "--suite",
         action="store_true",
-        help="Créer les deux profils Tests Entreprise et Tests Association.",
+        help="Créer les profils Tests Entreprise, Association et Micro-entreprise.",
     )
     parser.add_argument(
         "--force",
@@ -1409,6 +1558,7 @@ def write_profile(profile_id: str, profile_name: str, kind: str, force: bool) ->
         "createdAt": NOW,
         "developmentDatabase": True,
         "kind": kind,
+        "usageMode": "association" if kind == "association" else "tpe",
     }
     (profile_dir / "info.json").write_text(
         json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -1434,7 +1584,7 @@ def write_profile(profile_id: str, profile_name: str, kind: str, force: bool) ->
     finally:
         connection.close()
 
-    if foreign_key_errors or integrity != "ok" or version != 9:
+    if foreign_key_errors or integrity != "ok" or version != 18:
         database_path.unlink(missing_ok=True)
         raise SystemExit(
             f"Validation échouée: integrity={integrity}, version={version}, "
@@ -1455,6 +1605,7 @@ def write_profile(profile_id: str, profile_name: str, kind: str, force: bool) ->
 SUITE_PROFILES = (
     ("profile_test_entreprise", "Tests Entreprise", "entreprise"),
     ("profile_test_association", "Tests Association", "association"),
+    ("profile_test_micro", "Tests Micro-entreprise", "micro"),
 )
 
 

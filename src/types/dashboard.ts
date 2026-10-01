@@ -1,4 +1,5 @@
 import type { RegisterDocumentType } from './register';
+import type { MicroEnterpriseSummary } from './microEnterprise';
 
 export type DonationsByDonorMode = 'period' | 'cumulative';
 
@@ -128,4 +129,5 @@ export interface DashboardInsights {
   association: AssociationInsights;
   contacts: ContactInsights;
   reminders: LegalReminder[];
+  micro: MicroEnterpriseSummary | null;
 }

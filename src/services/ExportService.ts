@@ -13,6 +13,7 @@ import { DonationService } from './DonationService';
 import { AmortissementService } from './AmortissementService';
 import { clientDisplayName } from '../utils/invoiceFormat';
 import { ExcelCellValue, ExcelSheetInput, saveExcelWorkbook } from '../utils/excelExport';
+import { MicroEnterpriseService } from './MicroEnterpriseService';
 
 const DEFAULT_HEADERS: Array<{ header: string; field: ExportCsvField }> = [
   { header: 'Date', field: 'date' },
@@ -120,13 +121,92 @@ export const ExportService = {
     });
   },
 
+  async exportMicroReceiptsCsv(year: number): Promise<boolean> {
+    return withLog('ExportService.exportMicroReceiptsCsv', async () => {
+      const rows = await MicroEnterpriseService.listReceipts(`${year}-01-01`, `${year}-12-31`);
+      const headers = [
+        'N°',
+        'Date encaissement',
+        'Client',
+        'Nature de la recette',
+        'Montant',
+        'Mode de règlement',
+        'N° facture',
+        'Transaction',
+        'Référence',
+        'Source',
+      ];
+      const lines = rows.map((row) =>
+        [
+          row.sequence,
+          formatFrDate(row.receivedDate),
+          row.clientName,
+          row.description,
+          String(row.amount).replace('.', ','),
+          row.paymentMethod,
+          row.invoiceNumber ?? '',
+          row.transactionId ?? '',
+          row.reference ?? '',
+          row.source,
+        ]
+          .map((value) => csvQuote(String(value)))
+          .join(';')
+      );
+      const destination = await save({
+        defaultPath: `livre_recettes_${year}.csv`,
+        filters: [{ name: 'CSV', extensions: ['csv'] }],
+      });
+      if (!destination) return false;
+      await tauriBridge.writeExternalTextFile(
+        destination,
+        ['\ufeff' + headers.map(csvQuote).join(';'), ...lines].join('\n')
+      );
+      return true;
+    });
+  },
+
+  async exportMicroReceiptsExcel(year: number): Promise<boolean> {
+    return withLog('ExportService.exportMicroReceiptsExcel', async () => {
+      const rows = await MicroEnterpriseService.listReceipts(`${year}-01-01`, `${year}-12-31`);
+      return saveExcelWorkbook(`livre_recettes_${year}`, [
+        sheetFromObjects(
+          'Livre des recettes',
+          [
+            'N°',
+            'Date encaissement',
+            'Client',
+            'Nature de la recette',
+            'Montant',
+            'Mode de règlement',
+            'N° facture',
+            'Transaction',
+            'Référence',
+            'Source',
+          ],
+          rows.map((row) => [
+            row.sequence,
+            formatFrDate(row.receivedDate),
+            row.clientName,
+            row.description,
+            row.amount,
+            row.paymentMethod,
+            row.invoiceNumber ?? '',
+            row.transactionId ?? '',
+            row.reference ?? '',
+            row.source,
+          ])
+        ),
+      ]);
+    });
+  },
+
   /**
    * Export cumulé du profil actif : comptes, catégories, transactions,
    * contacts, factures, dons, immobilisations — une feuille par domaine.
    */
   async exportCumulativeExcel(): Promise<boolean> {
     return withLog('ExportService.exportCumulativeExcel', async () => {
-      const [accounts, categories, groups, transactions, invoiceMap, clients, factures, donations, immobilisations] =
+      const [accounts, categories, groups, transactions, invoiceMap, clients, factures, donations, immobilisations, microReceipts] =
         await Promise.all([
           ConfigService.listAccounts(),
           ConfigService.listCategories(),
@@ -137,6 +217,7 @@ export const ExportService = {
           InvoiceService.loadFactures(),
           DonationService.list(),
           AmortissementService.list(),
+          MicroEnterpriseService.listReceipts(),
         ]);
 
       const groupById = new Map(groups.map((g) => [g.id, g.name]));
@@ -264,6 +345,21 @@ export const ExportService = {
             i.statut,
             i.faibleValeur ? 'oui' : 'non',
             i.subventionInvestissement,
+          ])
+        ),
+        sheetFromObjects(
+          'Encaissements micro',
+          ['N°', 'Date', 'Client', 'Nature', 'Montant', 'Mode', 'Facture', 'Transaction', 'Référence'],
+          microReceipts.map((receipt) => [
+            receipt.sequence,
+            formatFrDate(receipt.receivedDate),
+            receipt.clientName,
+            receipt.description,
+            receipt.amount,
+            receipt.paymentMethod,
+            receipt.invoiceNumber ?? '',
+            receipt.transactionId ?? '',
+            receipt.reference ?? '',
           ])
         ),
       ];

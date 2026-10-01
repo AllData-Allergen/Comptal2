@@ -18,6 +18,7 @@ import {
   isInvoiceIssued,
   invoiceCoreChanged,
   invertPosteForAvoir,
+  validateMicroInvoice,
 } from './InvoiceLegalService';
 
 function serializeDevis(devis: Devis) {
@@ -238,6 +239,13 @@ export const InvoiceService = {
         totalTTC: roundMoney(totals.totalTTC),
         updatedAt: now,
       };
+      if (isInvoiceIssued(normalized)) {
+        const emetteur = await EmetteurService.loadEmetteur();
+        if (emetteur) {
+          const complianceErrors = validateMicroInvoice(normalized, emetteur);
+          if (complianceErrors.length > 0) throw new Error(complianceErrors.join(' '));
+        }
+      }
       await Db.execute(
         `INSERT INTO factures (id, client_id, numero, statut, devis_origine, supprime, payload, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)

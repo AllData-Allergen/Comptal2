@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { UserPlus, Check, Pencil, Trash2, Download, Upload as UploadIcon, Lock, Loader2 } from 'lucide-react';
+import { UserPlus, Check, Pencil, Trash2, Download, Upload as UploadIcon, Lock, Loader2, BriefcaseBusiness } from 'lucide-react';
 import { ProfileInfo } from '../../types/models';
 import { ProfileService } from '../../services/ProfileService';
 import { SettingsService } from '../../services/SettingsService';
 import { Logger } from '../../services/logger';
 import ConfirmModal from '../Common/ConfirmModal';
 import { USAGE_MODES, UsageMode, parseUsageMode } from '../../utils/usageMode';
+import { MicroEnterpriseService } from '../../services/MicroEnterpriseService';
 
 interface ProfilesTabProps {
   onProfileChanged: () => void;
@@ -16,6 +18,7 @@ interface ProfilesTabProps {
 
 const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(
     SettingsService.current.activeProfileId
@@ -23,6 +26,7 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
   const [newName, setNewName] = useState('');
   const [newUsage, setNewUsage] = useState<UsageMode>('tpe');
   const [newLocked, setNewLocked] = useState(false);
+  const [newMicroEnterprise, setNewMicroEnterprise] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<ProfileInfo | null>(null);
@@ -60,10 +64,18 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
   const handleCreate = () =>
     run(async () => {
       if (!newName.trim()) return;
-      const locked = newLocked && (newUsage === 'tpe' || newUsage === 'association');
-      await ProfileService.create(newName, newUsage, locked);
+      const usage = newMicroEnterprise ? 'tpe' : newUsage;
+      const locked = newLocked && (usage === 'tpe' || usage === 'association');
+      const created = await ProfileService.create(newName, usage, locked);
+      if (newMicroEnterprise) {
+        await ProfileService.setActive(created.id);
+        await MicroEnterpriseService.initializeProfile();
+        onProfileChanged();
+        navigate('/parametre?tab=organization&micro=1');
+      }
       setNewName('');
       setNewLocked(false);
+      setNewMicroEnterprise(false);
     }, t('settings.profiles.created'));
 
   const handleLock = () =>
@@ -272,6 +284,7 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
           <select
             className="ct-select"
             value={newUsage}
+            disabled={newMicroEnterprise}
             onChange={(e) => {
               const v = e.target.value as UsageMode;
               setNewUsage(v);
@@ -284,6 +297,18 @@ const ProfilesTab: React.FC<ProfilesTabProps> = ({ onProfileChanged }) => {
               </option>
             ))}
           </select>
+          <label className="flex items-center gap-2 text-sm rounded-lg border px-3 py-2" style={{ borderColor: 'var(--invoicing-gray-300)' }}>
+            <input
+              type="checkbox"
+              checked={newMicroEnterprise}
+              onChange={(e) => {
+                setNewMicroEnterprise(e.target.checked);
+                if (e.target.checked) setNewUsage('tpe');
+              }}
+            />
+            <BriefcaseBusiness size={15} />
+            {t('settings.profiles.microPreset')}
+          </label>
           {(newUsage === 'tpe' || newUsage === 'association') && (
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={newLocked} onChange={(e) => setNewLocked(e.target.checked)} />

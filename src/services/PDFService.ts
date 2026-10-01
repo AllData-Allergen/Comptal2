@@ -17,6 +17,7 @@ import { InvoiceService } from './InvoiceService';
 import {
   clientIdentityLines,
   mandatoryInvoiceMentions,
+  legalIssuerName,
   tvaBreakdownLines,
 } from './InvoiceLegalService';
 import { LegalMentionsService } from './LegalMentionsService';
@@ -110,6 +111,7 @@ function emetteurFromVendeur(
   if (!v) return { ...current };
   return {
     ...current,
+    type: v.type ?? current.type,
     denominationSociale: v.denominationSociale ?? current.denominationSociale,
     formeJuridique: v.formeJuridique ?? current.formeJuridique,
     adresse: v.adresse ?? current.adresse,
@@ -122,6 +124,7 @@ function emetteurFromVendeur(
     telephone: v.telephone ?? current.telephone,
     regimeTVA: v.regimeTVA ?? current.regimeTVA,
     mentionFranchiseTVA: v.mentionFranchiseTVA ?? current.mentionFranchiseTVA,
+    mediateurConsommation: v.mediateurConsommation ?? current.mediateurConsommation,
     logo: v.logo ?? current.logo,
     coordonneesBancaires: v.coordonneesBancaires ?? current.coordonneesBancaires,
   };
@@ -129,7 +132,7 @@ function emetteurFromVendeur(
 
 function buildHeader(emetteur: Emetteur, template?: PDFTemplate): Content[] {
   const lines = [
-    emetteur.denominationSociale,
+    legalIssuerName(emetteur),
     emetteur.formeJuridique,
     formatAdresse(emetteur),
     emetteur.siret ? `SIRET ${emetteur.siret}` : '',
@@ -420,7 +423,7 @@ export const PDFService = {
       const selected = await mentionsFor(emetteur);
       const mentions =
         facture.mentionsLegales ||
-        mandatoryInvoiceMentions(frozen, selected);
+        mandatoryInvoiceMentions(frozen, selected, facture);
       const iban = frozen.coordonneesBancaires;
       const titleKind = facture.isAvoir ? 'AVOIR' : 'FACTURE';
       const clientLines = clientIdentityLines(client);
@@ -429,6 +432,9 @@ export const PDFService = {
         ...buildHeader(frozen, template ?? undefined),
         { text: `${titleKind} N° ${facture.numero}`, style: 'title' },
         { text: `Date : ${facture.dateEmission.toLocaleDateString('fr-FR')}` },
+        facture.dateLivraison
+          ? { text: `Date de la prestation ou livraison : ${facture.dateLivraison.toLocaleDateString('fr-FR')}` }
+          : { text: '' },
         facture.dateEcheance
           ? { text: `Échéance : ${facture.dateEcheance.toLocaleDateString('fr-FR')}` }
           : { text: '' },
