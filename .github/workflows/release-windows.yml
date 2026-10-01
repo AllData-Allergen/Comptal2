@@ -36,13 +36,22 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Test updater manifest tooling
+        run: npm run updater:test
+
+      - name: Resolve release tag
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_TAG=v$version"
+
       - name: Ensure updater password env is defined
         shell: pwsh
         run: Add-Content -Path $env:GITHUB_ENV -Value "TAURI_SIGNING_PRIVATE_KEY_PASSWORD=$($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)"
         env:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
-      - name: Build NSIS installer and publish GitHub Release
+      - name: Build NSIS installer and create draft GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -56,7 +65,28 @@ jobs:
             Les profils, bases SQLite et pièces jointes restent dans
             `%APPDATA%\com.leopaul.comptal21\data` : une mise à jour
             remplace uniquement le programme, pas les données utilisateur.
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
           args: --bundles nsis
           updaterJsonPreferNsis: true
+
+      - name: Generate and validate BOM-free updater manifest
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          New-Item -ItemType Directory -Force updater-manifest | Out-Null
+          gh release download $env:RELEASE_TAG --pattern latest.json --dir updater-manifest
+          npm run updater:manifest:generate -- updater-manifest/latest.json updater-manifest/latest.json --require-platform windows-x86_64
+          npm run updater:manifest:validate -- updater-manifest/latest.json --require-platform windows-x86_64
+          gh release upload $env:RELEASE_TAG updater-manifest/latest.json --clobber
+
+          New-Item -ItemType Directory -Force updater-manifest-roundtrip | Out-Null
+          gh release download $env:RELEASE_TAG --pattern latest.json --dir updater-manifest-roundtrip
+          npm run updater:manifest:validate -- updater-manifest-roundtrip/latest.json --require-platform windows-x86_64
+
+      - name: Publish validated GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit $env:RELEASE_TAG --draft=false --latest

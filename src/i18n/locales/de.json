@@ -268,6 +268,7 @@
       "installing": "Installation… Die Anwendung wird neu gestartet.",
       "updateErrorOffline": "Update-Prüfung fehlgeschlagen: Keine Netzwerkverbindung oder Server nicht erreichbar.",
       "updateErrorNoRelease": "Noch keine veröffentlichte Version (Manifest nicht gefunden). Erwartete URL: {{url}}",
+      "updateErrorInvalidManifest": "Die Version ist vorhanden, aber ihr Update-Manifest ist ungültig. URL: {{url}}",
       "updateErrorUnknown": "Update-Prüfung fehlgeschlagen. Prüfen Sie ggf. {{url}}",
       "agentApiTitle": "Agenten-API & MCP",
       "agentApiIntro": "Comptal2.1 kann Ihre Profildaten (SQLite) für KI-Agenten über eine lokale HTTP-API und einen MCP-Server (Model Context Protocol) freigeben — z. B. zum Abgleich von Rechnungen und Bankbuchungen.",

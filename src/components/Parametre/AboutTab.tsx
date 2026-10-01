@@ -63,6 +63,8 @@ const AboutTab: React.FC = () => {
         return t('settings.about.updateErrorOffline');
       case 'no_release':
         return t('settings.about.updateErrorNoRelease', { url: UPDATER_MANIFEST_URL });
+      case 'invalid_manifest':
+        return t('settings.about.updateErrorInvalidManifest', { url: UPDATER_MANIFEST_URL });
       default:
         return t('settings.about.updateErrorUnknown', { url: UPDATER_MANIFEST_URL });
     }

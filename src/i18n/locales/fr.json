@@ -268,6 +268,7 @@
       "installing": "Installation… L'application va redémarrer.",
       "updateErrorOffline": "Vérification impossible : pas de connexion réseau ou serveur injoignable.",
       "updateErrorNoRelease": "Aucune release publiée pour le moment (manifest introuvable). URL attendue : {{url}}",
+      "updateErrorInvalidManifest": "La release existe, mais son manifest de mise à jour est invalide. URL : {{url}}",
       "updateErrorUnknown": "Vérification impossible. Si le problème persiste, vérifiez {{url}}",
       "agentApiTitle": "API agents & MCP",
       "agentApiIntro": "Comptal2.1 peut exposer vos données de profil (SQLite) à des agents IA via une API HTTP locale et un serveur MCP (Model Context Protocol), par exemple pour corréler factures et transactions.",
