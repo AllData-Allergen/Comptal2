@@ -1,0 +1,2300 @@
+# Spec OpenAPI de l'API agent Comptal2.1 (v1).
+#
+# Serveur local : http://127.0.0.1:7421 (jamais expose au reseau).
+# Authentification : Authorization: Bearer $COMPTAL_AGENT_TOKEN sur toutes les
+# routes sauf GET /health. Le jeton est genere hors du depot et jamais commite.
+openapi: 3.0.3
+info:
+  title: Comptal2.1 Agent API
+  version: "0.1.0"
+  description: |
+    API HTTP locale permettant a des agents IA de lire et ecrire dans une base
+    Comptal2.1 (profil SQLite). Ecritures avec dry_run (diff prevu sans ecriture)
+    et journal d'audit append-only (table audit_log).
+
+    Semantique metier alignee sur l'application :
+    - suppression de transaction = soft delete (deleted_at), invisible ensuite ;
+    - montants arrondis a 2 decimales ; dates au format ISO AAAA-MM-JJ ;
+    - la categorie de code X (transferts inter-comptes) est protegee ;
+    - suppression de compte = DELETE dur (cascade transactions) avec confirm=true.
+servers:
+  - url: http://127.0.0.1:7421
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: COMPTAL_AGENT_TOKEN
+  parameters:
+    dryRun:
+      name: dry_run
+      in: query
+      schema: { type: boolean }
+      description: Si true, renvoie le diff prevu (before/after) sans rien ecrire.
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+    offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    idParam:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    statsAccountIds:
+      name: account_ids
+      in: query
+      schema: { type: string }
+      description: Liste CSV d'ids de comptes (ex. 1,2). Vide = tous.
+    statsCategoryCodes:
+      name: category_codes
+      in: query
+      schema: { type: string }
+      description: Liste CSV de codes de categories (ex. ALIM,LOIS). Vide = toutes.
+    statsExcludeCategories:
+      name: exclude_categories
+      in: query
+      schema: { type: string }
+      description: Liste CSV de codes de categories a exclure (garde les transactions sans categorie).
+    statsDateStart:
+      name: date_start
+      in: query
+      schema: { type: string, format: date }
+      description: Date de debut inclusive (YYYY-MM-DD).
+    statsDateEnd:
+      name: date_end
+      in: query
+      schema: { type: string, format: date }
+      description: Date de fin inclusive (YYYY-MM-DD).
+    statsSearch:
+      name: search
+      in: query
+      schema: { type: string }
+      description: Recherche insensible a la casse dans le libelle (LIKE avec echappement).
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        detail: { type: string }
+    PeriodRange:
+      type: object
+      properties:
+        start: { type: string, format: date }
+        end: { type: string, format: date }
+    Health:
+      type: object
+      properties:
+        ok: { type: boolean }
+        service: { type: string }
+    Version:
+      type: object
+      properties:
+        service: { type: string }
+        api_version: { type: string }
+        capabilities:
+          type: array
+          items: { type: string }
+    Transaction:
+      type: object
+      properties:
+        id: { type: integer }
+        account_id: { type: integer }
+        account_code: { type: string }
+        date: { type: string, format: date }
+        value_date: { type: string, format: date, nullable: true }
+        debit:
+          type: number
+          description: Negatif = depense (convention app) ; positif = remboursement/annulation.
+        credit:
+          type: number
+          description: Positif = revenu.
+        label: { type: string }
+        category_code: { type: string, nullable: true }
+        tag: { type: string, nullable: true }
+        deleted_at: { type: string, nullable: true }
+        created_at: { type: string }
+        updated_at: { type: string }
+    ImportMapping:
+      type: object
+      description: Indices (0-based) des colonnes du CSV.
+      required: [dateColumnIndex, libelleColumnIndex, debitColumnIndex, creditColumnIndex]
+      properties:
+        dateColumnIndex: { type: integer, minimum: 0 }
+        dateValueColumnIndex: { type: integer, minimum: 0 }
+        libelleColumnIndex: { type: integer, minimum: 0 }
+        debitColumnIndex: { type: integer, minimum: 0 }
+        creditColumnIndex: { type: integer, minimum: 0 }
+        categoryColumnIndex: { type: integer, minimum: 0 }
+        accountColumnIndex: { type: integer, minimum: 0 }
+    ImportTemplate:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        account_id: { type: integer, nullable: true }
+        initial_balance: { type: number, nullable: true }
+        column_roles:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [date, dateValue, libelle, debit, credit, debitCredit, balance, ignore]
+        created_at: { type: string }
+        updated_at: { type: string, nullable: true }
+    Account:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+        color: { type: string }
+        initial_balance: { type: number }
+        created_at: { type: string }
+    Category:
+      type: object
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+        color: { type: string }
+        group_id: { type: integer, nullable: true }
+        created_at: { type: string }
+    AuditEntry:
+      type: object
+      properties:
+        id: { type: integer }
+        ts: { type: string }
+        actor: { type: string }
+        entity: { type: string }
+        entity_id: { type: string }
+        action: { type: string }
+        before: { type: object, nullable: true }
+        after: { type: object, nullable: true }
+    ListResponse:
+      type: object
+      properties:
+        items: { type: array, items: { type: object } }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+    DryRunResponse:
+      type: object
+      properties:
+        dry_run: { type: boolean, enum: [true] }
+        action: { type: string }
+        entity: { type: string }
+        entity_id: { type: string, nullable: true }
+        before: { type: object, nullable: true }
+        after: { type: object, nullable: true }
+    CategoryGroup:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        color: { type: string }
+        sort_order: { type: integer }
+        created_at: { type: string }
+    DevisDocument:
+      type: object
+      description: Payload JSON du devis (format camelCase de Comptal2.1/src/types/invoice.ts)
+      properties:
+        id: { type: string }
+        clientId: { type: string }
+        numero: { type: string }
+        statut: { type: string, enum: [brouillon, envoye, accepte, refuse, expire, caduc] }
+        dateEmission: { type: string, format: date }
+        dateValidite: { type: string, format: date, nullable: true }
+        postes: { type: array, items: { type: object } }
+        totalHT: { type: number }
+        totalTVA: { type: object, additionalProperties: { type: number } }
+        totalTTC: { type: number }
+    FactureDocument:
+      type: object
+      description: Payload JSON de la facture (format camelCase de Comptal2.1/src/types/invoice.ts)
+      properties:
+        id: { type: string }
+        clientId: { type: string }
+        numero: { type: string }
+        statut: { type: string, enum: [brouillon, envoyee, payee_partiellement, payee, en_retard, annulee] }
+        devisOrigine: { type: string, nullable: true }
+        dateEmission: { type: string, format: date }
+        postes: { type: array, items: { type: object } }
+        totalHT: { type: number }
+        totalTVA: { type: object, additionalProperties: { type: number } }
+        totalTTC: { type: number }
+    DevisInput:
+      type: object
+      required: [clientId, numero, postes]
+      properties:
+        clientId: { type: string }
+        numero: { type: string }
+        statut: { type: string }
+        dateEmission: { type: string, format: date }
+        dateValidite: { type: string, format: date }
+        postes: { type: array, items: { type: object } }
+        dry_run: { type: boolean }
+    FactureInput:
+      type: object
+      required: [clientId, numero, postes]
+      properties:
+        clientId: { type: string }
+        numero: { type: string }
+        statut: { type: string }
+        devisOrigine: { type: string }
+        dateEmission: { type: string, format: date }
+        postes: { type: array, items: { type: object } }
+        dry_run: { type: boolean }
+    ContactDocument:
+      type: object
+      description: Payload JSON du contact (format camelCase de Comptal2.1/src/types/contact.ts)
+      properties:
+        id: { type: string }
+        codeClient: { type: string }
+        type: { type: string, enum: [particulier, entreprise] }
+        nom: { type: string }
+        prenom: { type: string }
+        denominationSociale: { type: string }
+        email: { type: string }
+        telephone: { type: string }
+        siren: { type: string }
+        siret: { type: string }
+        couleur: { type: string }
+        capitalSocial: { type: string }
+        roles: { type: array, items: { type: string } }
+        groupeId: { type: string, nullable: true }
+        adresseFacturation: { type: object }
+        adresseLivraison: { type: object, nullable: true }
+        coordonneesBancaires: { type: object, nullable: true }
+        archived: { type: boolean }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    ContactGroupDocument:
+      type: object
+      description: Payload JSON d'un groupement de contacts (aligne ContactGroupService)
+      properties:
+        id: { type: string }
+        nom: { type: string }
+        couleur: { type: string, nullable: true }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    DonDocument:
+      type: object
+      description: Payload JSON d'un don manuel (aligne DonsService de l'app)
+      properties:
+        id: { type: string }
+        donateurId: { type: string }
+        donorLabel: { type: string }
+        montant: { type: number }
+        date: { type: string, format: date-time }
+        datePerception: { type: string, format: date-time }
+        natureDon: { type: string, enum: [numeraire, nature, mecenat_competences] }
+        modeVersement: { type: string, enum: [virement, cheque, especes, cb, prelevement, autre] }
+        description: { type: string }
+        notes: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    DonInput:
+      type: object
+      required: [donateurId, montant, natureDon]
+      properties:
+        id: { type: string }
+        donateurId: { type: string, description: "Id du donateur, ou 'ANONYME'" }
+        donorLabel: { type: string }
+        montant: { type: number, minimum: 0.01 }
+        date: { type: string, description: "YYYY-MM-DD ou ISO datetime (defaut : maintenant)" }
+        datePerception: { type: string }
+        natureDon: { type: string, enum: [numeraire, nature, mecenat_competences] }
+        modeVersement: { type: string, enum: [virement, cheque, especes, cb, prelevement, autre] }
+        description: { type: string }
+        notes: { type: string }
+        dry_run: { type: boolean }
+    DonPatch:
+      type: object
+      description: "PATCH partiel d'un don. Champs non fournis conserves ; null supprime le champ optionnel."
+      properties:
+        donateurId: { type: string, description: "Id du donateur, ou 'ANONYME'" }
+        donorLabel: { type: string, nullable: true }
+        montant: { type: number, minimum: 0.01 }
+        date: { type: string, description: "YYYY-MM-DD ou ISO datetime" }
+        datePerception: { type: string, nullable: true }
+        natureDon: { type: string, enum: [numeraire, nature, mecenat_competences] }
+        modeVersement: { type: string, nullable: true, enum: [virement, cheque, especes, cb, prelevement, autre] }
+        description: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        dry_run: { type: boolean }
+    LabelRuleDocument:
+      type: object
+      description: Regle d'attribution de libelle (aligne LabelRuleService de l'app)
+      properties:
+        id: { type: integer }
+        word: { type: string, description: "Sequence normalisee (majuscules, espaces reduits)" }
+        categoryCode: { type: string, nullable: true }
+        tag: { type: string, nullable: true }
+        active: { type: boolean }
+        createdAt: { type: string }
+    LabelRuleInput:
+      type: object
+      required: [word, categoryCode]
+      description: "Creation ou mise a jour par mot (upsert : un mot = une regle, comme LabelRuleService.upsert)."
+      properties:
+        word: { type: string, description: "Sequence de 4 caracteres minimum, normalisee automatiquement" }
+        categoryCode: { type: string, description: "Code d'une categorie existante" }
+        tag: { type: string, nullable: true }
+        dry_run: { type: boolean }
+    LabelRulePatch:
+      type: object
+      description: "PATCH partiel d'une regle. Le mot n'est pas modifiable (upsert par mot dans l'app)."
+      properties:
+        categoryCode: { type: string }
+        tag: { type: string, nullable: true }
+        active: { type: boolean }
+        dry_run: { type: boolean }
+    DonateurDocument:
+      type: object
+      description: Donateur (payload JSON, aligne DonateurService de l'app)
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [particulier, entreprise] }
+        civilite: { type: string, nullable: true, enum: ["M.", "Mme", "Mlle"] }
+        nom: { type: string, nullable: true }
+        prenom: { type: string, nullable: true }
+        denominationSociale: { type: string, nullable: true }
+        formeJuridique: { type: string, nullable: true }
+        siren: { type: string, nullable: true }
+        siret: { type: string, nullable: true }
+        adresse: { type: object, nullable: true, description: "Objet Adresse de l'app" }
+        email: { type: string, nullable: true }
+        telephone: { type: string, nullable: true }
+        categoryCode: { type: string, nullable: true, description: "Correlation don-categorie (un seul donateur par categorie)" }
+        notes: { type: string, nullable: true }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    DonateurInput:
+      type: object
+      description: Creation d'un donateur (type par defaut particulier ; id genere si absent).
+      properties:
+        id: { type: string, description: "Id fourni (defaut : genere 'donateur-...') ; 'ANONYME' reserve" }
+        type: { type: string, enum: [particulier, entreprise] }
+        civilite: { type: string, nullable: true, enum: ["M.", "Mme", "Mlle"] }
+        nom: { type: string, nullable: true }
+        prenom: { type: string, nullable: true }
+        denominationSociale: { type: string, nullable: true }
+        formeJuridique: { type: string, nullable: true }
+        siren: { type: string, nullable: true }
+        siret: { type: string, nullable: true }
+        adresse: { type: object, nullable: true }
+        email: { type: string, nullable: true }
+        telephone: { type: string, nullable: true }
+        categoryCode: { type: string, nullable: true, description: "Code d'une categorie existante" }
+        notes: { type: string, nullable: true }
+        dry_run: { type: boolean }
+    DonateurPatch:
+      type: object
+      description: "PATCH partiel d'un donateur. Champs non fournis conserves ; null supprime le champ optionnel."
+      properties:
+        type: { type: string, enum: [particulier, entreprise] }
+        civilite: { type: string, nullable: true, enum: ["M.", "Mme", "Mlle"] }
+        nom: { type: string, nullable: true }
+        prenom: { type: string, nullable: true }
+        denominationSociale: { type: string, nullable: true }
+        formeJuridique: { type: string, nullable: true }
+        siren: { type: string, nullable: true }
+        siret: { type: string, nullable: true }
+        adresse: { type: object, nullable: true }
+        email: { type: string, nullable: true }
+        telephone: { type: string, nullable: true }
+        categoryCode: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        dry_run: { type: boolean }
+    ContactInput:
+      type: object
+      description: "Creation/patch d'un contact. Creation : au moins 'nom', 'prenom' ou 'denominationSociale' requis."
+      properties:
+        id: { type: string, description: "Id fourni a la creation (defaut : genere 'cli-...')" }
+        type: { type: string, enum: [particulier, entreprise] }
+        nom: { type: string }
+        prenom: { type: string }
+        denominationSociale: { type: string }
+        email: { type: string }
+        telephone: { type: string }
+        siren: { type: string }
+        siret: { type: string }
+        couleur: { type: string, description: "Hex '#rrggbb'" }
+        capitalSocial: { type: string }
+        roles: { type: array, items: { type: string } }
+        groupeId: { type: string, nullable: true }
+        adresseFacturation: { type: object }
+        adresseLivraison: { type: object, nullable: true }
+        coordonneesBancaires:
+          type: object
+          nullable: true
+          properties:
+            titulaire: { type: string }
+            bic: { type: string }
+            banque: { type: string }
+            iban: { type: string }
+        codeClient: { type: string }
+        archived: { type: boolean }
+        dry_run: { type: boolean }
+  responses:
+    Unauthorized:
+      description: Jeton manquant ou invalide
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationError:
+      description: Corps ou parametres invalides
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Conflit (unicite, ressource protegee)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      security: []
+      summary: Ping applicatif (sans authentification, ne revele rien)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /version:
+    get:
+      summary: Version et capacites de l'API
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Version"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /transactions:
+    get:
+      summary: Liste des transactions (soft-supprimees exclues sauf include_deleted)
+      parameters:
+        - name: account_id
+          in: query
+          schema: { type: integer }
+        - name: include_deleted
+          in: query
+          schema: { type: boolean }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ListResponse"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Transaction"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Creer une transaction (value_date defaut = date)
+      parameters:
+        - $ref: "#/components/parameters/dryRun"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account_id, date, label]
+              description: >-
+                Mouvement unique : exactement un de debit/credit non nul. Convention app :
+                une depense est stockee avec un debit NEGATIF — un debit positif saisi est
+                normalise en negatif a l'ecriture ; un credit (revenu) est stocke positif.
+              properties:
+                account_id: { type: integer }
+                date: { type: string, format: date }
+                value_date: { type: string, format: date }
+                debit:
+                  type: number
+                  description: Montant de la depense (positif accepte, stocke negatif) ou negatif deja conforme.
+                credit:
+                  type: number
+                  description: Montant du revenu (positif) ; negatif accepte et normalise en positif.
+                label: { type: string }
+                category_code: { type: string, nullable: true }
+                dry_run: { type: boolean }
+      responses:
+        "201":
+          description: Creee
+        "200":
+          description: dry_run (diff prevu, rien d'ecrit)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DryRunResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /export/transactions:
+    get:
+      summary: Export CSV des transactions (aligne ExportService de l'app)
+      description: >-
+        Reponse text/csv (BOM UTF-8, separateur point-virgule). Colonnes : Date,
+        Compte, Libellé, Débit, Crédit, Catégorie, N° facture (paiements lies).
+        Memes filtres que GET /transactions.
+      parameters:
+        - name: format
+          in: query
+          schema: { type: string, default: csv, enum: [csv] }
+        - name: account_id
+          in: query
+          schema: { type: integer }
+        - name: include_deleted
+          in: query
+          schema: { type: boolean }
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: CSV
+          content:
+            text/csv:
+              schema: { type: string }
+        "400":
+          description: format non supporte ou parametre invalide
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /imports/transactions:
+    post:
+      summary: Import CSV de transactions (aligne ImportService de l'app)
+      description: >-
+        Parse un CSV (dates FR/ISO/serie Excel, montants FR/EN, formules
+        neutralisees) et cree les transactions sans categorie sur le compte
+        donne. Un enregistrement `imports` trace l'operation (filename,
+        periode, nombre de lignes). dry_run supporte (apercu 5 lignes).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account_id, csv, mapping]
+              properties:
+                account_id: { type: integer, minimum: 1 }
+                csv: { type: string, maxLength: 5000000, description: Contenu CSV (texte) }
+                filename: { type: string, maxLength: 300, default: import.csv }
+                delimiter: { type: string, maxLength: 1, description: "Separateur (defaut : ;)" }
+                mapping: { $ref: "#/components/schemas/ImportMapping" }
+      responses:
+        "201":
+          description: Import effectue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  imported: { type: integer }
+                  date_start: { type: string, format: date }
+                  date_end: { type: string, format: date }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Compte introuvable
+        "413":
+          description: CSV trop volumineux (> 5 Mo)
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /import-templates:
+    get:
+      summary: Liste les templates d'import (en-tetes -> roles)
+      responses:
+        "200":
+          description: Liste des templates
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ListResponse"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/ImportTemplate" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Cree un template d'import
+      description: >-
+        Associe des en-tetes de colonnes a des roles (date, dateValue, libelle,
+        debit, credit, debitCredit, balance, ignore). dry_run supporte.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, column_roles]
+              properties:
+                name: { type: string, maxLength: 200 }
+                account_id: { type: integer, minimum: 1, nullable: true }
+                initial_balance: { type: number, nullable: true }
+                column_roles:
+                  type: object
+                  description: "1..50 entrees en-tete -> role"
+                  additionalProperties:
+                    type: string
+                    enum: [date, dateValue, libelle, debit, credit, debitCredit, balance, ignore]
+      responses:
+        "201":
+          description: Template cree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  template: { $ref: "#/components/schemas/ImportTemplate" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Compte introuvable
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /transactions/{id}:
+    get:
+      summary: Lire une transaction (404 si soft-supprimee)
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      summary: Modifier partiellement une transaction
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+        - $ref: "#/components/parameters/dryRun"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: >-
+                Mouvement unique sur le resultat fusionne. Meme normalisation que POST :
+                debit positif stocke negatif (depense), credit stocke positif (revenu).
+              properties:
+                account_id: { type: integer }
+                date: { type: string, format: date }
+                value_date: { type: string, format: date, nullable: true }
+                debit:
+                  type: number
+                  description: Montant de la depense (positif accepte, stocke negatif) ou negatif deja conforme.
+                credit:
+                  type: number
+                  description: Montant du revenu (positif) ; negatif accepte et normalise en positif.
+                label: { type: string }
+                category_code: { type: string, nullable: true }
+                dry_run: { type: boolean }
+      responses:
+        "200":
+          description: Modifiee (ou diff si dry_run)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      summary: Soft delete (deleted_at) — reversible hors API
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+        - $ref: "#/components/parameters/dryRun"
+      responses:
+        "200":
+          description: Supprimee (soft)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /accounts:
+    get:
+      summary: Liste des comptes
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ListResponse"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Account"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Creer un compte
+      parameters:
+        - $ref: "#/components/parameters/dryRun"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name]
+              properties:
+                code: { type: string }
+                name: { type: string }
+                color: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+                initial_balance: { type: number }
+                dry_run: { type: boolean }
+      responses:
+        "201":
+          description: Cree
+        "200":
+          description: dry_run
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /accounts/{id}:
+    get:
+      summary: Lire un compte
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      summary: Modifier partiellement un compte
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+        - $ref: "#/components/parameters/dryRun"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string }
+                name: { type: string }
+                color: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+                initial_balance: { type: number }
+                dry_run: { type: boolean }
+      responses:
+        "200":
+          description: Modifie (ou diff si dry_run)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      summary: >
+        Supprimer durablement un compte (cascade transactions).
+        Exige ?confirm=true (ou body.confirm=true) : sans confirm -> 400.
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+        - name: confirm
+          in: query
+          schema: { type: boolean }
+          description: Confirmation explicite obligatoire (cascade).
+      responses:
+        "200":
+          description: Supprime
+        "400":
+          description: confirm manquant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /categories:
+    get:
+      summary: Liste des categories
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ListResponse"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Category"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Creer une categorie (code mis en majuscules ; code X refuse -> 409)
+      parameters:
+        - $ref: "#/components/parameters/dryRun"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name]
+              properties:
+                code: { type: string, minLength: 1 }
+                name: { type: string }
+                color: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+                group_id: { type: integer, nullable: true }
+                dry_run: { type: boolean }
+      responses:
+        "201":
+          description: Creee
+        "200":
+          description: dry_run
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /categories/{id}:
+    get:
+      summary: Lire une categorie
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      summary: >
+        Modifier partiellement une categorie. Pour la categorie X, code/name/color
+        ne sont pas modifiables (422) ; seul group_id l'est. Un changement de code
+        est repercute sur transactions et autocat_stats.
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+        - $ref: "#/components/parameters/dryRun"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string }
+                name: { type: string }
+                color: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+                group_id: { type: integer, nullable: true }
+                dry_run: { type: boolean }
+      responses:
+        "200":
+          description: Modifiee (ou diff si dry_run)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      summary: >
+        Supprimer une categorie : category_code = NULL sur ses transactions,
+        purge autocat_stats et label_rules. La categorie X est protegee (422).
+      parameters:
+        - $ref: "#/components/parameters/idParam"
+        - $ref: "#/components/parameters/dryRun"
+      responses:
+        "200":
+          description: Supprimee
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /audit:
+    get:
+      summary: Journal d'audit (lecture seule, ordre id decroissant)
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ListResponse"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AuditEntry"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /category-groups:
+    get:
+      summary: Regroupements de categories (aligne ConfigService.listCategoryGroups)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CategoryGroup"
+                  total:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Cree un regroupement de categories (sort_order attribue automatiquement, dry_run supporte, audit)
+      parameters:
+        - $ref: "#/components/parameters/dryRun"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100 }
+                color: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+                sort_order: { type: integer }
+                dry_run: { type: boolean }
+      responses:
+        "201":
+          description: Cree
+        "200":
+          description: dry_run (diff prevu, rien d'ecrit)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DryRunResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /category-groups/{id}:
+    get:
+      summary: Detail d'un regroupement de categories
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryGroup"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      summary: Modifie partiellement un regroupement (name, color, sort_order ; dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: "#/components/parameters/dryRun"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 100 }
+                color: { type: string, pattern: "^#[0-9a-fA-F]{6}$" }
+                sort_order: { type: integer }
+                dry_run: { type: boolean }
+      responses:
+        "200":
+          description: Modifie (ou diff si dry_run)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      summary: Supprime un regroupement (categories.group_id remises a NULL, categories conservees ; dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: "#/components/parameters/dryRun"
+      responses:
+        "200":
+          description: Supprime (ou diff si dry_run)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /balances:
+    get:
+      summary: Nets par compte et par categorie (requetes identiques a ConfigService.accountNets / categoryNets)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accounts:
+                    type: object
+                    additionalProperties:
+                      type: number
+                  categories:
+                    type: object
+                    additionalProperties:
+                      type: number
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /stats/kpis:
+    get:
+      summary: KPIs des transactions filtrees (aligne StatsService.kpis)
+      description: >
+        income = somme des credits, expenses = somme des debits (positif),
+        net = income - expenses, count = nombre de transactions,
+        largestIncome/largestExpense = plus gros montants, avgAmount = montant moyen.
+      parameters:
+        - $ref: "#/components/parameters/statsAccountIds"
+        - $ref: "#/components/parameters/statsCategoryCodes"
+        - $ref: "#/components/parameters/statsExcludeCategories"
+        - $ref: "#/components/parameters/statsDateStart"
+        - $ref: "#/components/parameters/statsDateEnd"
+        - $ref: "#/components/parameters/statsSearch"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  income:
+                    type: number
+                  expenses:
+                    type: number
+                  net:
+                    type: number
+                  count:
+                    type: integer
+                  largestIncome:
+                    type: number
+                  largestExpense:
+                    type: number
+                  avgAmount:
+                    type: number
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /stats/periods:
+    get:
+      summary: Semaines/mois/annees distincts des transactions (aligne StatsService.distinctPeriods)
+      description: >
+        weeks : lundi au dimanche (ISO), months : du 1er au dernier jour du mois,
+        years : annee civile. Ordre decroissant. Filtres identiques aux KPIs.
+      parameters:
+        - $ref: "#/components/parameters/statsAccountIds"
+        - $ref: "#/components/parameters/statsCategoryCodes"
+        - $ref: "#/components/parameters/statsExcludeCategories"
+        - $ref: "#/components/parameters/statsDateStart"
+        - $ref: "#/components/parameters/statsDateEnd"
+        - $ref: "#/components/parameters/statsSearch"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  weeks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PeriodRange"
+                  months:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PeriodRange"
+                  years:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PeriodRange"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /stats/category-totals:
+    get:
+      summary: Totaux par categorie (aligne StatsService.categoryTotals)
+      description: >
+        net = somme (debit + credit) par categorie, income/expenses detailles,
+        txCount = nombre de transactions. Trie par montant absolu decroissant.
+        Les transactions sans categorie sont groupees sous categoryCode null.
+      parameters:
+        - $ref: "#/components/parameters/statsAccountIds"
+        - $ref: "#/components/parameters/statsCategoryCodes"
+        - $ref: "#/components/parameters/statsExcludeCategories"
+        - $ref: "#/components/parameters/statsDateStart"
+        - $ref: "#/components/parameters/statsDateEnd"
+        - $ref: "#/components/parameters/statsSearch"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        categoryCode:
+                          type: string
+                          nullable: true
+                        net:
+                          type: number
+                        income:
+                          type: number
+                        expenses:
+                          type: number
+                        txCount:
+                          type: integer
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /devis:
+    get:
+      summary: Liste des devis (payload JSON aligne InvoiceService, supprime=0 uniquement)
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ListResponse"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/DevisDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Cree un devis (totaux recalcules, dry_run supporte, audit)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevisInput"
+      responses:
+        "201":
+          description: Cree
+        "200":
+          description: dry_run (diff prevu, aucune ecriture)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /devis/{id}:
+    get:
+      summary: Detail d'un devis (payload complet)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevisDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      summary: Patch d'un devis (fusion payload, totaux recalcules, champs geles apres emission, dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevisInput"
+      responses:
+        "200":
+          description: Modifie (ou diff prevu si dry_run)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  devis:
+                    $ref: "#/components/schemas/DevisDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /factures:
+    get:
+      summary: Liste des factures (payload JSON aligne InvoiceService, supprime=0 uniquement)
+      parameters:
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ListResponse"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/FactureDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Cree une facture (devisOrigine verifie, totaux recalcules, dry_run supporte, audit)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FactureInput"
+      responses:
+        "201":
+          description: Cree
+        "200":
+          description: dry_run (diff prevu, aucune ecriture)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /factures/{id}:
+    get:
+      summary: Detail d'une facture (payload complet)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FactureDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      summary: Patch d'une facture (fusion payload, totaux recalcules, champs geles apres emission, dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FactureInput"
+      responses:
+        "200":
+          description: Modifie (ou diff prevu si dry_run)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  facture:
+                    $ref: "#/components/schemas/FactureDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /factures/{id}/avoir:
+    post:
+      summary: Cree un avoir (facture invertee) depuis une facture (aligne InvoiceService.createAvoir)
+      description: >-
+        Postes inverses (quantite ou heuresEstimees negatifs), totaux recalcules,
+        paiements vides, statut envoyee, isAvoir=true, factureOrigine/factureOrigineNumero.
+        Numero genere automatiquement depuis invoice_settings sauf si numero fourni.
+        422 si la facture origine est deja un avoir. dry_run supporte, audit.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                numero: { type: string, description: "Numero explicite (genere automatiquement sinon)" }
+                dry_run: { type: boolean }
+      responses:
+        "201":
+          description: Avoir cree (ou diff prevu si dry_run)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  avoir:
+                    $ref: "#/components/schemas/FactureDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /factures/{id}/payment-status:
+    get:
+      summary: Statut de paiement d'une facture (aligne PaymentTrackingService.getPaymentStatus)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paidAmount: { type: number }
+                  totalTTC: { type: number }
+                  percent: { type: number }
+                  remaining: { type: number }
+                  statut_calcule:
+                    type: string
+                    description: payee | payee_partiellement | en_retard | envoyee | brouillon
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /factures/{id}/paiements/matches:
+    get:
+      summary: Transactions candidates pour payer cette facture (aligne findPaymentMatches, lecture seule)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        transaction:
+                          $ref: "#/components/schemas/Transaction"
+                        reason:
+                          type: string
+                          description: label | amount | both
+                        score: { type: number }
+                  total: { type: integer }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /factures/{id}/paiements/link:
+    post:
+      summary: Lie une transaction (credit) comme paiement de la facture (aligne linkTransactionToInvoice, dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [transaction_id]
+              properties:
+                transaction_id: { type: integer, minimum: 1 }
+                dry_run: { type: boolean }
+      responses:
+        "200":
+          description: Lie (ou deja lie, idempotent ; ou diff prevu si dry_run)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  facture:
+                    $ref: "#/components/schemas/FactureDocument"
+                  linked: { type: boolean }
+                  paiement_id: { type: string }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /factures/{id}/paiements/auto-link:
+    post:
+      summary: Lie automatiquement les transactions dont le libelle contient le numero de facture (aligne autoLinkLabelMatches, dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean }
+      responses:
+        "200":
+          description: Nombre de paiements lies (0 si aucun)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  facture:
+                    $ref: "#/components/schemas/FactureDocument"
+                  linked: { type: integer }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /factures/{id}/paiements:
+    post:
+      summary: Enregistre un paiement manuel (especes/cheque) et cree la transaction de tresorerie correspondante (aligne addManualPaiement, dry_run supporte, audit)
+      description: >-
+        L'app choisit le compte de tresorerie via EmetteurService ; l'agent-api
+        n'a pas d'emetteur, donc l'agent fournit account_id explicitement.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [montant, date, mode, account_id]
+              properties:
+                montant: { type: number, minimum: 0.01 }
+                date: { type: string, format: date }
+                mode: { type: string, enum: [especes, cheque] }
+                account_id: { type: integer, minimum: 1 }
+                reference: { type: string }
+                dry_run: { type: boolean }
+      responses:
+        "201":
+          description: Paiement enregistre + transaction de tresorerie creee
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  facture:
+                    $ref: "#/components/schemas/FactureDocument"
+                  paiement_id: { type: string }
+        "200":
+          description: dry_run (diff prevu, aucune ecriture)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /factures/{id}/paiements/{paiementId}:
+    delete:
+      summary: Retire un paiement de la facture (aligne unlinkPaiement, exige confirm=true, dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: paiementId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: confirm
+          in: query
+          required: true
+          schema: { type: boolean }
+          description: Confirmation obligatoire pour ce retrait
+      responses:
+        "200":
+          description: Paiement retire, statut recalcule (ou diff prevu si dry_run)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  facture:
+                    $ref: "#/components/schemas/FactureDocument"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /contacts:
+    get:
+      summary: Liste des contacts (payload JSON aligne ClientService, archives exclus par defaut)
+      parameters:
+        - name: include_archived
+          in: query
+          schema: { type: boolean }
+        - name: group
+          in: query
+          schema: { type: string }
+          description: Filtre par id de groupement (groupeId)
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Recherche insensible a la casse/accents sur nom, prenom, denominationSociale, email, telephone, siren, siret, codeClient
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ListResponse"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ContactDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Cree un contact (codeClient genere si absent, dry_run supporte, audit)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "201":
+          description: Cree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  contact:
+                    $ref: "#/components/schemas/ContactDocument"
+        "200":
+          description: dry_run (diff prevu, aucune ecriture)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /contacts/{id}:
+    get:
+      summary: Detail d'un contact (payload complet)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      summary: Patch d'un contact (fusion payload, dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "200":
+          description: Modifie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  contact:
+                    $ref: "#/components/schemas/ContactDocument"
+        "200-dry-run":
+          description: dry_run (diff prevu, aucune ecriture)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      summary: Supprime definitivement un contact (refuse 409 si devis, factures ou dons lies ; confirm=true requis ; dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/dryRun"
+      responses:
+        "200":
+          description: Supprime (ou diff si dry_run)
+        "400":
+          description: confirm=true manquant
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Liens existants (devis, factures ou dons)
+
+  /contact-groups:
+    get:
+      summary: Liste des groupements de contacts (tries par nom)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ContactGroupDocument"
+                  total: { type: integer }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Cree un groupement de contacts (id genere prefixe cgrp si absent ; id fourni existant -> 422 ; dry_run supporte, audit)
+      parameters:
+        - $ref: "#/components/parameters/dryRun"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom]
+              properties:
+                id: { type: string }
+                nom: { type: string, maxLength: 100 }
+                dry_run: { type: boolean }
+      responses:
+        "201":
+          description: Cree
+        "200":
+          description: dry_run (diff prevu, rien d'ecrit)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DryRunResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /contact-groups/{id}:
+    patch:
+      summary: Renomme un groupement de contacts (createdAt conserve, updatedAt rafraichi ; dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/dryRun"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nom]
+              properties:
+                nom: { type: string, maxLength: 100 }
+                dry_run: { type: boolean }
+      responses:
+        "200":
+          description: Modifie (ou diff si dry_run)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      summary: Supprime un groupement (clients.groupeId remis a NULL, contacts conserves ; dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/dryRun"
+      responses:
+        "200":
+          description: Supprime (ou diff si dry_run)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /dons:
+    get:
+      summary: Liste des dons manuels (tries par date decroissante)
+      parameters:
+        - name: donateur_id
+          in: query
+          schema: { type: string }
+          description: Filtre par id de donateur
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ListResponse"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/DonDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Cree un don manuel (donateur requis ou 'ANONYME', dry_run supporte, audit)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DonInput"
+      responses:
+        "201":
+          description: Cree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  don:
+                    $ref: "#/components/schemas/DonDocument"
+        "200":
+          description: dry_run (diff prevu, aucune ecriture)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /dons/{id}:
+    patch:
+      summary: Modifie un don manuel (fusion partielle, updatedAt rafraichi, audit avant/apres)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DonPatch"
+      responses:
+        "200":
+          description: Modifie (ou diff si dry_run)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  don:
+                    $ref: "#/components/schemas/DonDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      summary: Supprime un don manuel (definitif, confirm=true requis, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: confirm
+          in: query
+          schema: { type: boolean }
+          description: "true obligatoire pour confirmer la suppression"
+        - name: dry_run
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Supprime (ou diff si dry_run)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  deleted: { type: string }
+        "400":
+          description: confirm manquant
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /label-rules:
+    get:
+      summary: Liste des regles de libelles (table label_rules, triees par word)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LabelRuleDocument"
+                  total: { type: integer }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Cree ou met a jour une regle par mot (upsert, dry_run supporte, audit)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabelRuleInput"
+      responses:
+        "201":
+          description: Cree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  rule:
+                    $ref: "#/components/schemas/LabelRuleDocument"
+        "200":
+          description: "Regle existante mise a jour (upsert) ou dry_run (diff prevu)"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /label-rules/{id}:
+    patch:
+      summary: Modifie une regle (categoryCode, tag, active ; le mot n'est pas modifiable, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LabelRulePatch"
+      responses:
+        "200":
+          description: Modifie (ou diff si dry_run)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  rule:
+                    $ref: "#/components/schemas/LabelRuleDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      summary: Supprime une regle (definitif, sans cascade, audit ; pas de confirm requis)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: dry_run
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Supprime (ou diff si dry_run)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  deleted: { type: string }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /label-rules/apply:
+    post:
+      summary: Applique les regles de libelles actives aux transactions sans categorie (mot le plus long prioritaire, audit)
+      description: >
+        Cible les transactions actives (non supprimees) sans categorie, filtreees
+        par ids (liste d'entiers) ou import_id. dry_run=true renvoie l'apercu
+        des changements sans rien ecrire.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items: { type: integer }
+                  description: Cible explicite de transactions (sinon toutes les actives sans categorie)
+                import_id:
+                  type: integer
+                  description: Cible les transactions d'un import
+                dry_run: { type: boolean }
+      responses:
+        "200":
+          description: >
+            {applied, changes} si application effective ;
+            {dry_run, changes, count} si apercu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  applied: { type: integer }
+                  dry_run: { type: boolean }
+                  count: { type: integer }
+                  changes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        before:
+                          type: object
+                          properties:
+                            categoryCode: { type: string, nullable: true }
+                        after:
+                          type: object
+                          properties:
+                            categoryCode: { type: string }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /donateurs:
+    get:
+      summary: Liste des donateurs (tri updated_at desc ; q : recherche nom/prenom/raison sociale/email)
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DonateurDocument"
+                  total: { type: integer }
+                  limit: { type: integer }
+                  offset: { type: integer }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Cree un donateur (id genere ou fourni unique ; type par defaut particulier ; dry_run supporte, audit)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DonateurInput"
+      responses:
+        "201":
+          description: Cree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  donateur:
+                    $ref: "#/components/schemas/DonateurDocument"
+        "200":
+          description: dry_run (diff prevu, aucune ecriture)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /donateurs/{id}:
+    patch:
+      summary: Modifie un donateur (PATCH partiel, updatedAt rafraichi, dry_run supporte, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DonateurPatch"
+      responses:
+        "200":
+          description: Modifie (ou diff si dry_run)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  donateur:
+                    $ref: "#/components/schemas/DonateurDocument"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      summary: Supprime un donateur (definitif, supprime aussi ses liens donateur_transactions ; confirm=true requis, audit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: confirm
+          in: query
+          schema: { type: boolean }
+        - name: dry_run
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Supprime (ou diff si dry_run)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  deleted: { type: string }
+        "400":
+          description: confirm=true manquant
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"

@@ -22,7 +22,7 @@ type UpdateState =
 
 const AboutTab: React.FC = () => {
   const { t } = useTranslation();
-  const version = Logger.session?.appVersion ?? '2.1.3';
+  const version = Logger.session?.appVersion ?? '2.1.4';
   const [state, setState] = useState<UpdateState>({ phase: 'idle' });
 
   const handleCheck = async () => {

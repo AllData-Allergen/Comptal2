@@ -151,7 +151,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
             </p>
           )}
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-            Version {Logger.session?.appVersion ?? '2.1.2'}
+            Version {Logger.session?.appVersion ?? '2.1.4'}
           </p>
         </div>
       )}

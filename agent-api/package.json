@@ -1,0 +1,15 @@
+{
+  "name": "comptal21-agent-api",
+  "private": true,
+  "version": "0.1.1",
+  "type": "module",
+  "description": "API locale (HTTP 127.0.0.1) pour piloter Comptal2.1 par des agents IA — auth par jeton, dry-run, journal d'audit",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test \"test/*.test.ts\""
+  }
+}
